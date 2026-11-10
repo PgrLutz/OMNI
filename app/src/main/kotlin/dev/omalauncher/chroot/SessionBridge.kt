@@ -53,7 +53,10 @@ class SessionBridge(
     fun start(timeoutSeconds: Int = 10): Boolean {
         val ctx = context ?: return false
         // Clear stale state: any older bridge process and its FIFO/files.
-        val clean = factory.commandString("pkill -f bc.cmd 2>/dev/null; rm -f /run/user/0/bc.cmd /run/user/0/bc.out; true")
+        // The pkill pattern must not appear in this command's own cmdline
+        // (the rm path holds "bc.cmd"), so match the bridge's unique shell
+        // prefix with the bracket trick instead.
+        val clean = factory.commandString("pkill -f '[--]norc -c set +e' 2>/dev/null; rm -f /run/user/0/bc.cmd /run/user/0/bc.out; true")
         runCatching {
             runBlocking { TermuxBackend.run(ctx, "su -c ${dev.omalauncher.backend.shellQuote(clean)}", timeoutSeconds = 10) }
         }
