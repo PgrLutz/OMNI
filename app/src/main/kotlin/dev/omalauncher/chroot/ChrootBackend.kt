@@ -240,6 +240,13 @@ class ChrootBackend(
                         ChrootLog.log("keymap generated: ${k.length} bytes -> $keymapFile")
                     } else ChrootLog.log("keymap generation failed (no xkbcli output)")
                 } else ChrootLog.log("keymap present: $keymapFile")
+            } else {
+                // The Termux transport has no local processes: without the
+                // bridge, streams, detached GUI launches and file writes are
+                // dead. NOT ready — one-shot fallbacks can't keep the contract.
+                ChrootLog.log("session bridge FAILED to start — Linux not ready")
+                _state.value = BackendState.Failed
+                return BackendState.Failed
             }
         }
 

@@ -29,24 +29,36 @@ class SessionBridge(
     private val dir = File(filesDir, "xdg")
     private val cmdFile = File(dir, "bc.cmd")
     private val outFile = File(dir, "bc.out")
+    private val errFile = File(dir, "bc.err")
     private val quitLine = "__OMARCHY_QUIT__"
+    private val endLine = "__OMARCHY_END__"
 
     /** One command at a time: the bridge is a single shared command/output stream. */
     private val sendMutex = kotlinx.coroutines.sync.Mutex()
 
-    /** The guest-side bridge loop: one command per line from bc.cmd, output to bc.out. */
+    /** The guest-side bridge loop: one COMMAND BLOCK per END-marker from bc.cmd, output to bc.out, stderr to bc.err. */
     internal fun script(): String =
         """
         set +e
         D=/run/user/0
         : > "${'$'}D/bc.out"; chmod 666 "${'$'}D/bc.out"
+        : > "${'$'}D/bc.err"; chmod 666 "${'$'}D/bc.err"
         while true; do
           if [ -s "${'$'}D/bc.cmd" ]; then
-            line=${'$'}(sed -n '1p' "${'$'}D/bc.cmd")
-            sed -i '1d' "${'$'}D/bc.cmd"
-            if [ "${'$'}line" = "$quitLine" ]; then break; fi
-            printf '%s\n' "${'$'} ${'$'}line" >> "${'$'}D/bc.out"
-            ( eval "${'$'}line" ) >> "${'$'}D/bc.out" 2>&1
+            first=${'$'}(sed -n '1p' "${'$'}D/bc.cmd")
+            if [ "${'$'}first" = "$quitLine" ]; then sed -i '1d' "${'$'}D/bc.cmd"; break; fi
+            # Read the whole block up to the END marker: newlines must survive
+            # (comments, functions, heredocs break when flattened to one line).
+            block=""
+            while true; do
+              line=${'$'}(sed -n '1p' "${'$'}D/bc.cmd")
+              sed -i '1d' "${'$'}D/bc.cmd"
+              if [ "${'$'}line" = "__OMARCHY_END__" ]; then break; fi
+              [ -z "${'$'}line" ] && continue
+              block="${'$'}block${'$'}line"${'$'}'\n'
+            done
+            printf '%s\n' "${'$'} ${'$'}first" >> "${'$'}D/bc.out"
+            ( eval "${'$'}block" ) >> "${'$'}D/bc.out" 2>>"${'$'}D/bc.err"
             printf '__OMARCHY_EXIT__%s\n' "${'$'}?" >> "${'$'}D/bc.out"
           fi
           sleep 0.2
@@ -90,11 +102,9 @@ class SessionBridge(
 
     private fun sendLocked(command: String, timeoutSeconds: Int): CmdResult {
         val deadline = System.currentTimeMillis() + timeoutSeconds * 1000L
-        // One line for the bridge; bash blocks need separators but a ';' right
-        // after then/else/do/{ is a syntax error, so drop it there.
-        var oneLine = command.replace("\n", "; ")
-        oneLine = oneLine.replace("then;", "then").replace("else;", "else").replace("do;", "do").replace("{;", "{")
-        val cmdBytes = (oneLine + "\n").toByteArray(StandardCharsets.UTF_8)
+        // The bridge reads a whole block up to the END marker, so multi-line
+        // scripts keep their newlines (comments, functions, heredocs).
+        val cmdBytes = (command + "\n" + endLine + "\n").toByteArray(StandardCharsets.UTF_8)
         // Append to the app-owned command file; the bridge consumes line by line.
         runCatching {
             RandomAccessFile(cmdFile, "rw").use { raf ->
@@ -103,6 +113,7 @@ class SessionBridge(
             }
         }.getOrElse { return CmdResult("", "cannot write command file: $it", -1) }
         var readFrom = runCatching { outFile.length() }.getOrElse { 0L }
+        var errFrom = runCatching { errFile.length() }.getOrElse { 0L }
         val out = StringBuilder()
         val cap = 4 * 1024 * 1024
         while (System.currentTimeMillis() < deadline) {
@@ -123,7 +134,18 @@ class SessionBridge(
                         val marker = "__OMARCHY_EXIT__"
                         if (line.startsWith(marker)) {
                             val code = line.removePrefix(marker).trim().toIntOrNull() ?: -1
-                            return CmdResult(out.toString().trimEnd(), "", code)
+                            val err =
+                                runCatching {
+                                    if (errFile.length() > errFrom) {
+                                        RandomAccessFile(errFile, "r").use { raf ->
+                                            raf.seek(errFrom)
+                                            val b = ByteArray((errFile.length() - errFrom).coerceAtMost(8 * 1024).toInt())
+                                            raf.readFully(b)
+                                            String(b, StandardCharsets.UTF_8).trimEnd()
+                                        }
+                                    } else ""
+                                }.getOrElse { "" }
+                            return CmdResult(out.toString().trimEnd(), err, code)
                         }
                         if (line == "\$ $command" || line.startsWith("\$ ")) continue
                         if (out.length < cap) out.appendLine(line)

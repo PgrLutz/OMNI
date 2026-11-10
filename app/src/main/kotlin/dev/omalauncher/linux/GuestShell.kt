@@ -48,14 +48,14 @@ class GuestShell(
                     // is not connected). Output lines go through onLine.
                     dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot branch cmd=${command.take(120)}")
                     val out = StringBuilder()
-                    val code =
-                        runCatching { guest.run(command, onLine = { out.appendLine(it) }, timeoutSeconds = timeoutSeconds) }
-                            .getOrElse {
-                                dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot run threw: ${it.message}")
-                                return@withContext ShellResult("", it.message ?: "guest command failed", -1)
-                            }
-                    dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot result code=$code out=${out.toString().take(400).trimEnd()}")
-                    return@withContext ShellResult(out.toString().trimEnd(), "", code)
+                    runCatching {
+                        val r = guest.runResult(command, timeoutSeconds) { out.appendLine(it) }
+                        dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot result code=${r.exitCode} err=${r.err.take(120)} out=${out.toString().take(400).trimEnd()}")
+                        return@withContext ShellResult(out.toString().trimEnd(), r.err, r.exitCode)
+                    }.getOrElse {
+                        dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot run threw: ${it.message}")
+                        return@withContext ShellResult("", it.message ?: "guest command failed", -1)
+                    }
                 }
                 runCatching { exec(command, timeoutSeconds) }.getOrElse {
                     stop()

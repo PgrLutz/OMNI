@@ -1008,7 +1008,7 @@ class WidgetEngine(
         val missingBins = found.programs
         for (spec in specs) {
             val p = spec.program ?: continue
-            val need = p.requires["pacman"].orEmpty().filter { it in missingPkgs }
+            val need = p.requires["pacman"].orEmpty().filter { (dev.omalauncher.linux.APT_ALIASES[it] ?: it) in missingPkgs }
             // The GATE is the binaries a widget actually runs: a declared
             // package without an apt equivalent (Arch-only names) must not
             // block a widget whose tools are already present. Package names

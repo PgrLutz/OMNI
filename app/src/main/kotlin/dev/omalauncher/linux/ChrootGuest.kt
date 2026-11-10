@@ -54,6 +54,10 @@ class ChrootGuest(
         return result.exitCode
     }
 
+    /** The same as [run] but keeps stderr and the exit code, for widget failure reporting. */
+    fun runResult(script: String, timeoutSeconds: Int, onLine: (String) -> Unit): dev.omalauncher.backend.CmdResult =
+        runBlocking { backend.run(script, timeoutSeconds = timeoutSeconds, onLine = onLine) }
+
     /** App-side view of a stream's output/pid files (the guest sees the bound XDG dir). */
     fun streamOutput(tag: String): File = File(runtimeDir, tag)
 
