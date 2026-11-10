@@ -131,7 +131,7 @@ class ChrootBackend(
                     val te = TermuxEscalator(context)
                     if (probeRoot(te)) te else null
                 }.getOrNull()
-                ?: return@withContext fail(
+                ?: return fail(
                     BackendState.PrivilegeUnavailable(
                         "no privilege escalation: direct su is hidden from this app's uid, and Termux RUN_COMMAND did not answer as root (allow Termux:API in Settings → Termux first)",
                     ),
@@ -141,23 +141,23 @@ class ChrootBackend(
         ChrootLog.log("transport: ${if (termuxMode) "Termux RUN_COMMAND" else "direct su"}")
         val (rootfsOk, rootfsOut, rootfsErr) =
             runCatching { drain(esc, "test -d ${shellQuote(config.rootfs)} && echo ok", 10) }
-                .getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("escalation exec failed: ${it.message ?: it}")) }
+                .getOrElse { return fail(BackendState.PrivilegeUnavailable("escalation exec failed: ${it.message ?: it}")) }
         ChrootLog.log("rootfs probe: code=$rootfsOk out=${rootfsOut.trim()} err=${rootfsErr.trim()}")
         if (rootfsOk != 0) {
             // The probe detail (Permission denied = SELinux on Termux's private
             // dirs; No such file = wrong path) decides the fix.
             val detail = listOfNotNull(rootfsOut, rootfsErr).filter { it.isNotBlank() }.joinToString(" | ").trim()
-            return@withContext fail(BackendState.RootfsMissing(config.rootfs, detail))
+            return fail(BackendState.RootfsMissing(config.rootfs, detail))
         }
-        val missingTool = runCatching { missingToolVia(esc) }.getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("escalation exec failed: ${it.message ?: it}")) }
-        if (missingTool != null) return@withContext fail(BackendState.HostToolMissing(missingTool.first, missingTool.second))
+        val missingTool = runCatching { missingToolVia(esc) }.getOrElse { return fail(BackendState.PrivilegeUnavailable("escalation exec failed: ${it.message ?: it}")) }
+        if (missingTool != null) return fail(BackendState.HostToolMissing(missingTool.first, missingTool.second))
 
         val (mountState, report) =
             runCatching { MountSupervisor(config, esc).ensureMounted() }
-                .getOrElse { return@withContext fail(BackendState.MountFailed(listOf("mount escalation failed: ${it.message ?: it}"))) }
+                .getOrElse { return fail(BackendState.MountFailed(listOf("mount escalation failed: ${it.message ?: it}"))) }
         if (mountState is BackendState.Failed) {
             report.log.forEach { ChrootLog.log("mount: $it") }
-            return@withContext mountState
+            return mountState
         }
         report.log.forEach { ChrootLog.log("mount: $it") }
         ChrootLog.log("mounts present=${report.present} byUs=${report.mountedByUs}")
