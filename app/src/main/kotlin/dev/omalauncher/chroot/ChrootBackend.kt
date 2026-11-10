@@ -40,7 +40,6 @@ class ChrootBackend(
     private val config: ChrootConfig,
     private val stateDir: File,
     private val context: android.content.Context,
-    private val selinuxCtx: String? = null,
 ) : Backend {
 
     private val _state = MutableStateFlow<BackendState>(BackendState.Checking)
@@ -89,13 +88,11 @@ class ChrootBackend(
      */
     fun launchDetached(command: String): Boolean {
         val bridge = sessionBridge ?: return false
-        // GUI processes must run in the APP's SELinux domain: the Wayland
-        // server (untrusted_app) can only read shm memfds created in that
-        // domain. runcon (guest root -> the app context) does the transition;
-        // the selinuxfs bind at /sys/fs/selinux makes runcon usable in-chroot.
-        val escalated = if (selinuxCtx != null) "runcon $selinuxCtx -- $command" else command
-        val ok = runCatching { bridge.send("nohup $escalated >/dev/null 2>&1 &", timeoutSeconds = 10).exitCode == 0 }.getOrElse { false }
-        ChrootLog.log("launchDetached ok=$ok: ${escalated.take(80)}")
+        // SELinux must be permissive for GUI apps: the Wayland server
+        // (untrusted_app) cannot read shm memfds created by guest-root
+        // processes while enforcing (prepare() calls setenforce 0).
+        val ok = runCatching { bridge.send("nohup $command >/dev/null 2>&1 &", timeoutSeconds = 10).exitCode == 0 }.getOrElse { false }
+        ChrootLog.log("launchDetached ok=$ok: ${command.take(80)}")
         return ok
     }
 
@@ -215,6 +212,12 @@ class ChrootBackend(
             ChrootLog.log("session bridge started=$started")
             if (started) sessionBridge = bridge
         }
+
+        // GUI apps (terminal/foot) need SELinux permissive: the Wayland server
+        // (untrusted_app) cannot read the shm memfds guest-root processes
+        // create while enforcing. Best-effort; GUI stays broken when refused.
+        val (_, seOut, seErr) = drain(esc, "setenforce 0", 30)
+        ChrootLog.log("setenforce 0 -> ${seErr.ifBlank { seOut }.trim().ifEmpty { "permissive (no output)" }}")
 
         MountLedgerFile.write(
             ledgerFile,
