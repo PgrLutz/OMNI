@@ -71,8 +71,11 @@ class ChrootBackend(
     }
 
     /** Writes a guest file through the bridge (root); false when the bridge is down. */
-    fun writeGuestFile(guestPath: String, content: ByteArray, executable: Boolean = false): Boolean =
-        sessionBridge?.writeFile(guestPath, content, executable) ?: false
+    fun writeGuestFile(guestPath: String, content: ByteArray, executable: Boolean = false): Boolean {
+        val ok = sessionBridge?.writeFile(guestPath, content, executable) ?: false
+        ChrootLog.log("writeGuestFile: $guestPath ok=$ok")
+        return ok
+    }
 
     /** Merges `K=V` pairs into every subsequent guest process's environment. */
     fun updateGuestEnv(env: List<String>) {

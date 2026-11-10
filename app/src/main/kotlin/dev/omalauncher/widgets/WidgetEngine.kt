@@ -1065,12 +1065,19 @@ class WidgetEngine(
             // guest-side widget files go through the bridge as root — eagerly,
             // once, at sync time. The legacy Managed path stays for proot.
             scope.launch {
+                ChrootLog.log("guestManaged: writing shims via bridge")
                 for (name in listOf("AGENTS.md", "CLAUDE.md")) {
-                    backend.writeGuestFile("/root/$name", AGENT_POINTER.toByteArray(), executable = false)
+                    val ok = backend.writeGuestFile("/root/$name", AGENT_POINTER.toByteArray(), executable = false)
+                    ChrootLog.log("guestManaged: /root/$name ok=$ok")
                 }
                 for (bin in listOf("owl-check", "owl-send")) {
                     val bytes = runCatching { context.assets.open("$bin.sh").use { it.readBytes() } }.getOrNull()
-                    if (bytes != null) backend.writeGuestFile("/usr/local/bin/$bin", bytes, executable = true)
+                    if (bytes != null) {
+                        val ok = backend.writeGuestFile("/usr/local/bin/$bin", bytes, executable = true)
+                        ChrootLog.log("guestManaged: /usr/local/bin/$bin ok=$ok (${bytes.size} bytes)")
+                    } else {
+                        ChrootLog.log("guestManaged: asset $bin.sh missing")
+                    }
                 }
             }
             return emptyList()
