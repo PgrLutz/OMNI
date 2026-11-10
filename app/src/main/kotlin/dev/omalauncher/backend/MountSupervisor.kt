@@ -45,7 +45,9 @@ class MountSupervisor(
                         // guest processes reach the same socket as before.
                         runtimeDirBindCommand(config)
                     } else {
-                        mountCommand(config, guestPath)
+                        // missing carries the full destination; mountCommand
+                        // expects the guest path (it prefixes the rootfs itself).
+                        mountCommand(config, guestPath.removePrefix(config.rootfs))
                     }
                 val (code, out, err) = drain(esc, cmd, 60)
                 log += listOfNotNull("$ $cmd", out.takeIf { it.isNotBlank() }, err.takeIf { it.isNotBlank() }, "exit $code")
@@ -109,7 +111,7 @@ internal fun mountCommand(
 internal fun runtimeDirBindCommand(config: ChrootConfig): String {
     val source = shellQuote(File(config.stateDir, "xdg").path)
     val dst = shellQuote(config.rootfs + config.runtimeDirGuest)
-    return "mkdir -p $dst && ${shellQuote(config.hostTools.mount)} --bind $source $dst"
+    return "mkdir -p $source $dst && ${shellQuote(config.hostTools.mount)} --bind $source $dst"
 }
 
 /**
