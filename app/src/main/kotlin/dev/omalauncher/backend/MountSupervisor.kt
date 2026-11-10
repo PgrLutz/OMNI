@@ -136,7 +136,9 @@ internal fun homeVisibilityCommand(config: ChrootConfig): String {
             "/root",
             "/root/.local", "/root/.local/share", "/root/.local/share/applications", "/root/.local/bin",
             "/root/.config", "/root/.config/omalauncher", "/root/.config/omarchy", "/root/.config/btop",
-            "/root/.local/state", "/root/.local/state/omarchy", "/root/.cache",
+            "/root/.local/state", "/root/.local/state/omarchy",
+            "/root/.local/state/omarchy/current", "/root/.local/state/omarchy/current/theme",
+            "/root/.local/state/omalauncher", "/root/.cache",
         ).joinToString(" ") { shellQuote(config.rootfs + it) }
     return "mkdir -p $dirs && chmod 755 $dirs 2>/dev/null; echo ok"
 }

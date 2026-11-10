@@ -528,8 +528,11 @@ class Runtime(
         scope.launch { launcherFont.apply() }
         // The recent apps strip on home lists Linux apps before the app list is ever opened.
         scope.launch { refreshApps() }
-        // Themes picked without Linux are written into the guest now.
-        themes.renderGuest()
+        // Themes picked without Linux are written into the guest now. The app
+        // cannot write the rootfs under SELinux, so failures here must not
+        // block the rest of the bring-up (provisioner sync, updates).
+        runCatching { themes.renderGuest() }
+            .onFailure { Log.w(TAG, "renderGuest failed", it) }
         withContext(Dispatchers.IO) {
             provisioner.sync()
             audio.start()
