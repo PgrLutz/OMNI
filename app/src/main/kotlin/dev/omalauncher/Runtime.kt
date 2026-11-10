@@ -541,7 +541,9 @@ class Runtime(
         withContext(Dispatchers.IO) { updates.load() }
         scope.launch {
             // Update steps that need the network; the home screen doesn't wait for them.
-            bootstrap.runBacklog()
+            // The Arch backlog only exists on the legacy path — with a chroot
+            // backend it would re-download the Arch rootfs on every screen start.
+            if (chrootBackend == null) bootstrap.runBacklog()
             updates.check()
         }
         // Apps render in software until the GPU passed its check on this system build.
