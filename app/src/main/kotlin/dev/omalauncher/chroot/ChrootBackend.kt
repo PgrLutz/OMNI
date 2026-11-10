@@ -121,8 +121,7 @@ class ChrootBackend(
     private var factory: ProcessFactory? = null
     private var registry: ProcessRegistry? = null
     private var pool: ChrootShellPool? = null
-    private var sessionBridge: SessionBridge? = null
-        internal set
+    internal var sessionBridge: SessionBridge? = null
 
     suspend fun prepare(): BackendState = withContext(Dispatchers.IO) {
         _state.value = BackendState.Checking

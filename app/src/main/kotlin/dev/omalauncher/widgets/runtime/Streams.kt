@@ -85,7 +85,7 @@ class Streams(
                 val pidFile = guest.streamOutput("$tag.pid")
                 val outFile = guest.streamOutput("$tag.out")
                 outFile.delete()
-                if (!guest.streamBackground(command.trimPrefix("exec bash -c ").trim(), tag)) {
+                if (!guest.streamBackground(command.removePrefix("exec bash -c ").trim(), tag)) {
                     close()
                     awaitClose { }
                     return@callbackFlow
