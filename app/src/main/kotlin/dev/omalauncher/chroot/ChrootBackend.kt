@@ -245,8 +245,8 @@ class ChrootBackend(
                 // bridge, streams, detached GUI launches and file writes are
                 // dead. NOT ready — one-shot fallbacks can't keep the contract.
                 ChrootLog.log("session bridge FAILED to start — Linux not ready")
-                _state.value = BackendState.Failed
-                return BackendState.Failed
+                _state.value = BackendState.PrivilegeUnavailable("session bridge failed to start")
+                return BackendState.PrivilegeUnavailable("session bridge failed to start")
             }
         }
 

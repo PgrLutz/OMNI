@@ -50,8 +50,8 @@ class GuestShell(
                     val out = StringBuilder()
                     runCatching {
                         val r = guest.runResult(command, timeoutSeconds) { out.appendLine(it) }
-                        dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot result code=${r.exitCode} err=${r.err.take(120)} out=${out.toString().take(400).trimEnd()}")
-                        return@withContext ShellResult(out.toString().trimEnd(), r.err, r.exitCode)
+                        dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot result code=${r.exitCode} err=${r.stderr.take(120)} out=${out.toString().take(400).trimEnd()}")
+                        return@withContext ShellResult(out.toString().trimEnd(), r.stderr, r.exitCode)
                     }.getOrElse {
                         dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot run threw: ${it.message}")
                         return@withContext ShellResult("", it.message ?: "guest command failed", -1)
