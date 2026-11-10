@@ -74,7 +74,7 @@ class SessionBridge(
         // (the bridge's "set +e" has a literal plus that pkill eats as a
         // quantifier), so match the unique "while true; do" with the bracket
         // trick instead.
-        val clean = factory.commandString("pkill -f '[w]hile true; do' 2>/dev/null; rm -f /run/user/0/bc.cmd /run/user/0/bc.out; true")
+        val clean = factory.commandString("pkill -f '[w]hile true; do' 2>/dev/null; rm -f /run/user/0/bc.cmd /run/user/0/bc.out /run/user/0/bc.err; true")
         runCatching {
             runBlocking { TermuxBackend.run(ctx, "su -c ${dev.omalauncher.backend.shellQuote(clean)}", timeoutSeconds = 10) }
         }
