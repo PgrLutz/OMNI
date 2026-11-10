@@ -23,7 +23,7 @@ class SessionBridgeTest {
                 ),
                 SuEscalator("/system/bin/su"),
             ),
-            null as android.content.Context,
+            null, // context only used by start(); these tests check script()
         )
 
     @Test

@@ -22,7 +22,7 @@ import java.io.IOException
 class SessionBridge(
     private val filesDir: File,
     private val factory: ProcessFactory,
-    private val context: android.content.Context,
+    private val context: android.content.Context?,
 ) {
     private val dir = File(filesDir, "xdg")
     private val cmdFifo = File(dir, "bc.cmd")
@@ -54,9 +54,10 @@ class SessionBridge(
 
     /** Starts the guest shell in the background and opens both FIFO ends. */
     fun start(timeoutSeconds: Int = 10): Boolean {
+        val ctx = context ?: return false
         val escalated = factory.commandString("bash --noprofile --norc -c " + dev.omalauncher.backend.shellQuote(script()))
         // Through Termux's own su (allowlisted, ksu domain) -> chroot -> bridge.
-        TermuxBackend.launchBackground(context, "su -c ${dev.omalauncher.backend.shellQuote(escalated)}")
+        TermuxBackend.launchBackground(ctx, "su -c ${dev.omalauncher.backend.shellQuote(escalated)}")
         return connect(timeoutSeconds)
     }
 
