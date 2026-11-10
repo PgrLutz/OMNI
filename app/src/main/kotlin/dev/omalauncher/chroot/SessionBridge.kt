@@ -81,7 +81,11 @@ class SessionBridge(
      */
     fun send(command: String, timeoutSeconds: Int = 30): CmdResult {
         val deadline = System.currentTimeMillis() + timeoutSeconds * 1000L
-        val cmdBytes = (command.replace("\n", "; ") + "\n").toByteArray(StandardCharsets.UTF_8)
+        // One line for the bridge; bash blocks need separators but a ';' right
+        // after then/else/do/{ is a syntax error, so drop it there.
+        var oneLine = command.replace("\n", "; ")
+        oneLine = oneLine.replace("then;", "then").replace("else;", "else").replace("do;", "do").replace("{;", "{")
+        val cmdBytes = (oneLine + "\n").toByteArray(StandardCharsets.UTF_8)
         // Append to the app-owned command file; the bridge consumes line by line.
         runCatching {
             RandomAccessFile(cmdFile, "rw").use { raf ->
