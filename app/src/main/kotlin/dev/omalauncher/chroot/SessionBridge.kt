@@ -89,7 +89,7 @@ class SessionBridge(
         val w = writer ?: throw IllegalStateException("session bridge not connected")
         val r = reader ?: throw IllegalStateException("session bridge not connected")
         w.write(command.replace('\n', ' ').toByteArray())
-        w.write('\n'.toByte())
+        w.write(10) // newline, Int overload
         w.flush()
         val out = StringBuilder()
         var code = -1
