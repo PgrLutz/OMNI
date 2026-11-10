@@ -21,7 +21,7 @@ internal object DependencyCheck {
     ): String =
         (if (packages.isEmpty() || !pacman) "" else "pacman -T ${packages.joinToString(" ") { shellQuote(it) }} | sed 's/^/pkg /'; ") +
             (if (packages.isEmpty() || pacman) "" else "for p in ${packages.joinToString(" ") { shellQuote(it) }}; do dpkg-query -W -f='\${Status}' \"\$p\" 2>/dev/null | grep -q '^install ok installed' || echo \"pkg \$p\"; done; ") +
-            (if (programs.isEmpty()) "" else "for c in ${programs.joinToString(" ") { shellQuote(it) }}; do command -v \"\\\$c\" >/dev/null || echo \\\"bin \\\$c\\\"; done; ") +
+            (if (programs.isEmpty()) "" else "for c in ${programs.joinToString(" ") { shellQuote(it) }}; do command -v \"\$c\" >/dev/null || echo \"bin \$c\"; done; ") +
             "true"
 
     fun parse(out: String): Missing {

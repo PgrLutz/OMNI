@@ -4,6 +4,7 @@ import dev.omalauncher.backend.CmdResult
 import dev.omalauncher.backend.ProcessFactory
 import dev.omalauncher.termux.TermuxBackend
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.charset.StandardCharsets
