@@ -3,6 +3,7 @@ package dev.omalauncher.chroot
 import dev.omalauncher.backend.CmdResult
 import dev.omalauncher.backend.ProcessFactory
 import dev.omalauncher.termux.TermuxBackend
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.charset.StandardCharsets
@@ -54,7 +55,7 @@ class SessionBridge(
         // Clear stale state: any older bridge process and its FIFO/files.
         val clean = factory.commandString("pkill -f bc.cmd 2>/dev/null; rm -f /run/user/0/bc.cmd /run/user/0/bc.out; true")
         runCatching {
-            TermuxBackend.run(ctx, "su -c ${dev.omalauncher.backend.shellQuote(clean)}", timeoutSeconds = 10)
+            runBlocking { TermuxBackend.run(ctx, "su -c ${dev.omalauncher.backend.shellQuote(clean)}", timeoutSeconds = 10) }
         }
         runCatching { outFile.delete(); cmdFile.delete() }
         runCatching { cmdFile.writeText("") } // app-owned: untrusted_app can write its own file
