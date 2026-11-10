@@ -95,6 +95,7 @@ class ChrootBackend(
     private var factory: ProcessFactory? = null
     private var registry: ProcessRegistry? = null
     private var pool: ChrootShellPool? = null
+    private var sessionBridge: SessionBridge? = null
 
     suspend fun prepare(): BackendState = withContext(Dispatchers.IO) {
         _state.value = BackendState.Checking
@@ -177,6 +178,13 @@ class ChrootBackend(
             val registry = ProcessRegistry(esc, config.hostTools.ps)
             this@ChrootBackend.registry = registry
             pool = ChrootShellPool(tokens.map { ChrootShell(config, factory, registry, it) })
+        } else {
+            // The persistent session: RUN_COMMAND in the background runs the
+            // guest bridge shell; commands flow over the xdg FIFOs.
+            val bridge = SessionBridge(stateDir, factory, context)
+            val started = runCatching { bridge.start() }.getOrElse { false }
+            ChrootLog.log("session bridge started=$started")
+            if (started) sessionBridge = bridge
         }
 
         MountLedgerFile.write(
@@ -194,6 +202,14 @@ class ChrootBackend(
         onLine: (String) -> Unit,
     ): CmdResult = withContext(Dispatchers.IO) {
         if (termuxMode) {
+            // The persistent session bridge when it is up; otherwise a fresh
+            // one-shot through RUN_COMMAND.
+            val bridge = sessionBridge
+            if (bridge != null) {
+                val result = bridge.send(script, timeoutSeconds)
+                result.stdout.lineSequence().forEach(onLine)
+                return@withContext result
+            }
             // One-shot through Termux: no local process, so no marker protocol.
             val f = requireFactory()
             val esc = escalator ?: error("not prepared")
@@ -246,7 +262,9 @@ class ChrootBackend(
         retry: Boolean,
     ): CmdResult {
         if (termuxMode) {
-            // No pooled shells over RUN_COMMAND: every command is a fresh one-shot.
+            // The persistent session when connected; otherwise a fresh one-shot.
+            val bridge = sessionBridge
+            if (bridge != null) return bridge.send(command, timeoutSeconds)
             return run(command, timeoutSeconds) { }
         }
         val p = pool ?: error("backend not prepared: ${_state.value}")
@@ -290,6 +308,8 @@ class ChrootBackend(
             val r = registry
             registry = null
             if (r != null) runCatching { r.killAll() }
+            runCatching { sessionBridge?.close() }
+            sessionBridge = null
         }
         // Keep the last state: resetting to Checking here left the UI on a
         // "Preparing" that nothing would ever finish. prepare() sets Checking

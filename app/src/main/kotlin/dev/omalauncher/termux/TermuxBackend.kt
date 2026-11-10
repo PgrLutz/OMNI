@@ -161,6 +161,23 @@ object TermuxBackend {
         }
     }
 
+    /**
+     * Launches [command] in the background and returns at once: RUN_COMMAND
+     * with BACKGROUND=true keeps the process running after the call returns.
+     * The long-lived session bridge uses this to start the guest shell.
+     */
+    fun launchBackground(context: Context, command: String) {
+        require(command.isNotBlank()) { "Command is empty" }
+        val shellCommand = PREFIX + "/bin/bash -lc " + shellQuote(command)
+        val request =
+            Intent(ACTION_RUN_COMMAND)
+                .setComponent(ComponentName(PACKAGE, SERVICE))
+                .putExtra(COMMAND_PATH, PREFIX + "/bin/bash")
+                .putExtra(ARGUMENTS, arrayOf("-lc", shellCommand))
+                .putExtra(BACKGROUND, true)
+        context.startService(request)
+    }
+
     internal fun deliver(id: Int, result: Bundle) {
         pending[id]?.complete(result)
     }
