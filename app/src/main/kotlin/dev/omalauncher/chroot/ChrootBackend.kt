@@ -93,22 +93,30 @@ class ChrootBackend(
         // The app sandbox cannot stat Termux's private dirs (the Kali rootfs
         // and the host tools live under /data/data/com.termux), so every
         // presence check is escalated through su, never an app-side File stat.
-        val su = config.suCandidates.firstOrNull { File(it).isFile }
+        val su = config.suCandidates.firstOrNull { it.isNotBlank() }
             ?: return@withContext fail(BackendState.PrivilegeUnavailable("no su candidate in ${config.suCandidates}"))
         val esc = SuEscalator(su)
-        if (!probeRoot(esc)) return@withContext fail(BackendState.PrivilegeUnavailable("$su did not answer as root"))
-        val (rootfsOk, rootfsOut, rootfsErr) = drain(esc, "test -d ${shellQuote(config.rootfs)} && echo ok", 10)
+        // Every escalated call may throw (su exec denied by the sandbox when
+        // the current install's uid is not on the KernelSU allowlist); a throw
+        // must become a concrete state, never a silent stuck-at-Checking.
+        val rootOk = runCatching { probeRoot(esc) }.getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("su exec failed: ${it.message ?: it}")) }
+        if (!rootOk) return@withContext fail(BackendState.PrivilegeUnavailable("$su did not answer as root"))
+        val (rootfsOk, rootfsOut, rootfsErr) =
+            runCatching { drain(esc, "test -d ${shellQuote(config.rootfs)} && echo ok", 10) }
+                .getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("su exec failed: ${it.message ?: it}")) }
         if (rootfsOk != 0) {
             // The probe detail (Permission denied = SELinux on Termux's private
             // dirs; No such file = wrong path) decides the fix.
             val detail = listOfNotNull(rootfsOut, rootfsErr).filter { it.isNotBlank() }.joinToString(" | ").trim()
             return@withContext fail(BackendState.RootfsMissing(config.rootfs, detail))
         }
-        val missingTool = missingToolVia(esc)
+        val missingTool = runCatching { missingToolVia(esc) }.getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("su exec failed: ${it.message ?: it}")) }
         if (missingTool != null) return@withContext fail(BackendState.HostToolMissing(missingTool.first, missingTool.second))
         escalator = esc
 
-        val (mountState, report) = MountSupervisor(config, esc).ensureMounted()
+        val (mountState, report) =
+            runCatching { MountSupervisor(config, esc).ensureMounted() }
+                .getOrElse { return@withContext fail(BackendState.MountFailed(listOf("mount escalation failed: ${it.message ?: it}"))) }
         if (mountState is BackendState.Failed) return@withContext mountState
         // Best-effort: make the guest home traversable by the launcher's own
         // uid (it reads .desktop entries, themes and agent state through the

@@ -5,37 +5,29 @@ import dev.omalauncher.backend.HostTools
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
-import java.nio.file.Files
 
 class BackendSelectorTest {
 
-    private fun dir() = Files.createTempDirectory("bsel").toFile()
-
-    private fun config(su: String): ChrootConfig =
+    private fun config(su: String?): ChrootConfig =
         ChrootConfig(
             rootfs = "/data/.../kali-rolling/rootfs",
             hostTools = HostTools.forPrefix("/x"),
-            suCandidates = listOf(su),
+            suCandidates = listOfNotNull(su),
             stateDir = "/s",
         )
 
     @Test
-    fun `usable when a root escalator exists`() {
-        val d = dir()
-        val su = File(d, "su").apply { createNewFile() }
-        assertTrue(BackendSelector.canUseChroot(config(su.path)))
+    fun `usable when a su candidate is configured`() {
+        assertTrue(BackendSelector.canUseChroot(config("/system/bin/su")))
     }
 
     @Test
     fun `not usable without any su candidate`() {
-        val d = dir()
-        assertFalse(BackendSelector.canUseChroot(config(File(d, "absent").path)))
+        assertFalse(BackendSelector.canUseChroot(config(null)))
     }
 
-    // The rootfs and the host tools cannot be statted from the app sandbox
-    // (they live in Termux's private dirs): their presence is verified by the
-    // escalated prepare(), which reports RootfsMissing / HostToolMissing /
-    // PrivilegeUnavailable with the concrete path. canUseChroot only decides
-    // whether a backend EXISTS to prepare.
+    // The Android sandbox hides su from un-allowlisted uids, so an app-side
+    // stat is not a reliable check: presence is decided on the path strings,
+    // and whether su answers as root for THIS install is verified by the
+    // escalated prepare (PrivilegeUnavailable with the exec detail otherwise).
 }

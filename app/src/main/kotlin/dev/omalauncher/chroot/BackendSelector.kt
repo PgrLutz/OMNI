@@ -11,13 +11,15 @@ import java.io.File
 object BackendSelector {
 
     /**
-     * The chroot backend is usable when a root escalator exists. The rootfs
-     * and the host tools cannot be statted from the app sandbox (they live in
-     * Termux's private dirs), so their presence is verified by the escalated
-     * prepare, which reports the concrete failure state.
+     * The chroot backend is usable whenever a su candidate exists (as a path
+     * string): the Android sandbox hides su from un-allowlisted uids, so an
+     * app-side stat is not a reliable check. Whether su actually answers as
+     * root for THIS install is verified by the escalated prepare, which
+     * reports PrivilegeUnavailable with the exec detail instead of silently
+     * falling back to the legacy flow.
      */
     fun canUseChroot(config: ChrootConfig): Boolean =
-        config.suCandidates.any { File(it).isFile }
+        config.suCandidates.any { it.isNotBlank() }
 
     /** Runtime config, rooted at the app's files dir (the Termux prefix remains the default). */
     fun runtimeConfig(filesDir: File): ChrootConfig =
