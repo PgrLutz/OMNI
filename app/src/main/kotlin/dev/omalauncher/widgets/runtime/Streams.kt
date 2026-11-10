@@ -91,20 +91,24 @@ class Streams(
                     return@callbackFlow
                 }
                 val pid = runCatching { pidFile.readText().trim().toLongOrNull() }.getOrNull()
+                var cancelled = false
                 launch(Dispatchers.IO) {
                     var off = 0L
                     var lastLen = -1L
-                    while (isActive) {
+                    while (true) {
                         val len = outFile.length()
                         if (len > off) {
+                            val remaining = (len - off).toInt()
                             RandomAccessFile(outFile, "r").use { raf ->
                                 raf.seek(off)
-                                raf.readBytes().toString(Charsets.UTF_8).lineSequence().forEach { line -> if (line.isNotEmpty()) trySend(line) }
+                                val buf = ByteArray(remaining)
+                                raf.readFully(buf)
+                                buf.toString(Charsets.UTF_8).lineSequence().forEach { line -> if (line.isNotEmpty()) trySend(line) }
                             }
                             off = len
                         }
                         // Writer gone and no new output for a beat: the stream ended.
-                        if (pid != null && !File("/proc/$pid").exists() && len == lastLen) {
+                        if (cancelled || (pid != null && !File("/proc/$pid").exists() && len == lastLen)) {
                             trySend(null)
                             break
                         }
@@ -114,6 +118,7 @@ class Streams(
                     close()
                 }
                 awaitClose {
+                    cancelled = true
                     guest.stopStream(tag)
                     outFile.delete()
                 }
