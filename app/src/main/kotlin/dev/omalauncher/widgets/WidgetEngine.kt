@@ -19,6 +19,7 @@ import dev.omalauncher.BuildConfig
 import dev.omalauncher.LauncherData
 import dev.omalauncher.Runtime
 import dev.omalauncher.linux.Agent
+import dev.omalauncher.chroot.ChrootLog
 import dev.omalauncher.linux.LinuxGuest
 import dev.omalauncher.linux.pacmanInstall
 import dev.omalauncher.linux.runJob
