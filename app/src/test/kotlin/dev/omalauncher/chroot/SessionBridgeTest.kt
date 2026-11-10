@@ -46,7 +46,7 @@ class SessionBridgeTest {
         //   __OMARCHY_EXIT__0
         // send() must drop the echo line and return stdout + the parsed code.
         val s = bridge().script()
-        assertTrue(s.contains("printf '%s\\n' \"${'$'} $line\" >&3"))
+        assertTrue(s.contains("printf '%s\\n' \"${'$'} ${'$'}line\" >&3"))
         assertTrue(s.contains("__OMARCHY_EXIT__"))
     }
 }

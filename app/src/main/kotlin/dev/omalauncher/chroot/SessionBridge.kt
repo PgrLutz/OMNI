@@ -44,7 +44,7 @@ class SessionBridge(
         exec 4<"${'$'}D/bc.cmd"
         while IFS= read -r line <&4; do
           if [ "${'$'}line" = "$quitLine" ]; then break; fi
-          printf '%s\n' "${'$'} $line" >&3
+          printf '%s\n' "${'$'} ${'$'}line" >&3
           ( eval "${'$'}line" ) >&3 2>&3
           code=${'$'}?
           printf '__OMARCHY_EXIT__%s\n' "${'$'}code" >&3
