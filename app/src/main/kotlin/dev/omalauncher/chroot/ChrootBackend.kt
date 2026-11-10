@@ -38,7 +38,7 @@ import kotlin.coroutines.coroutineContext
  */
 class ChrootBackend(
     private val config: ChrootConfig,
-    stateDir: File,
+    private val stateDir: File,
     private val context: android.content.Context,
 ) : Backend {
 
