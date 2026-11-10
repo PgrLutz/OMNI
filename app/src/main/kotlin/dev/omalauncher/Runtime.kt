@@ -386,12 +386,9 @@ class Runtime(
     /** Stops an install that hasn't completed, running or failed, and deletes what it downloaded and unpacked. */
     fun cancelLinux() {
         if (chrootBackend != null) {
-            // Cancelling a chroot prepare stops the backend's state; mounts stay
-            // (presence-guarded, never auto-unmounted) by policy.
-            scope.launch {
-                withContext(Dispatchers.IO) { chrootLifecycle?.close() }
-                setService(false)
-            }
+            // With a chroot backend there is nothing to cancel: prepare is a
+            // short bounded sequence, a failed one stays visible for retry,
+            // and a ready one is removed with removeLinux, not cancel.
             return
         }
         val install = linuxJob

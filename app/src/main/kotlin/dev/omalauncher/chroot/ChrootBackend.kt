@@ -93,14 +93,25 @@ class ChrootBackend(
         // The app sandbox cannot stat Termux's private dirs (the Kali rootfs
         // and the host tools live under /data/data/com.termux), so every
         // presence check is escalated through su, never an app-side File stat.
-        val su = config.suCandidates.firstOrNull { it.isNotBlank() }
-            ?: return@withContext fail(BackendState.PrivilegeUnavailable("no su candidate in ${config.suCandidates}"))
-        val esc = SuEscalator(su)
-        // Every escalated call may throw (su exec denied by the sandbox when
-        // the current install's uid is not on the KernelSU allowlist); a throw
-        // must become a concrete state, never a silent stuck-at-Checking.
-        val rootOk = runCatching { probeRoot(esc) }.getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("su exec failed: ${it.message ?: it}")) }
-        if (!rootOk) return@withContext fail(BackendState.PrivilegeUnavailable("$su did not answer as root"))
+        // Try each su candidate in order until one actually answers as root:
+        // the first is often a path that does not exist (Termux's bin/su), and
+        // the sandbox hides su from un-allowlisted uids, so neither stat nor
+        // the order can be trusted — the exec probe decides. A throw (exec
+        // denied) must become a concrete state, never a silent stuck-Checking.
+        val tried = StringBuilder()
+        var suEsc: SuEscalator? = null
+        for (candidate in config.suCandidates) {
+            if (candidate.isBlank()) continue
+            val e = SuEscalator(candidate)
+            val outcome = runCatching { probeRoot(e) }
+            if (outcome.getOrElse { false }) {
+                suEsc = e
+                break
+            }
+            if (tried.isNotEmpty()) tried.append("; ")
+            tried.append(candidate).append(" → ").append(outcome.exceptionOrNull()?.message ?: "did not answer as root")
+        }
+        val esc = suEsc ?: return@withContext fail(BackendState.PrivilegeUnavailable("no su candidate answered as root: $tried"))
         val (rootfsOk, rootfsOut, rootfsErr) =
             runCatching { drain(esc, "test -d ${shellQuote(config.rootfs)} && echo ok", 10) }
                 .getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("su exec failed: ${it.message ?: it}")) }
@@ -227,7 +238,9 @@ class ChrootBackend(
             registry = null
             if (r != null) runCatching { r.killAll() }
         }
-        _state.value = BackendState.Checking
+        // Keep the last state: resetting to Checking here left the UI on a
+        // "Preparing" that nothing would ever finish. prepare() sets Checking
+        // itself when it starts.
     }
 
     private val processLock = Any()
