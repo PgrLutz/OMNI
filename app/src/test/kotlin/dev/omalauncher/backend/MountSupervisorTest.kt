@@ -40,10 +40,10 @@ class MountSupervisorTest {
     }
 
     @Test
-    fun `runtime dir bind creates the guest XDG_RUNTIME_DIR and binds the launcher dir`() {
+    fun `runtime dir bind creates the source and the guest XDG_RUNTIME_DIR`() {
         val cmd = runtimeDirBindCommand(config())
         val cfg = config()
-        assertTrue(cmd.startsWith("mkdir -p '${cfg.rootfs}/run/user/0' &&"))
+        assertTrue(cmd.startsWith("mkdir -p '/s/xdg' '${cfg.rootfs}/run/user/0' &&"))
         assertTrue(cmd.contains("--bind '/s/xdg' '${cfg.rootfs}/run/user/0'"))
     }
 
