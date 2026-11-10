@@ -148,10 +148,12 @@ class ChrootBackend(
         // app-visible rootfs bind). Never fatal.
         runCatching { drain(esc, homeVisibilityCommand(config), 20) }
 
+        val tokens =
+            if (termuxMode) emptyList() // no pooled shells over RUN_COMMAND
+            else List(config.shellCount) { "omarchy-${UUID.randomUUID()}" }
         val factory = ProcessFactory(config, esc)
         this@ChrootBackend.factory = factory
         if (!termuxMode) {
-            val tokens = List(config.shellCount) { "omarchy-${UUID.randomUUID()}" }
             val registry = ProcessRegistry(esc, config.hostTools.ps)
             this@ChrootBackend.registry = registry
             pool = ChrootShellPool(tokens.map { ChrootShell(config, factory, registry, it) })
