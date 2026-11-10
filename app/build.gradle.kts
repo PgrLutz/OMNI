@@ -52,6 +52,16 @@ android {
     lint { lintConfig = file("lint.xml") }
 
     signingConfigs {
+        // Debug builds sign with the checked-in keystore so EVERY CI run and
+        // the local build produce the SAME signature: installing a newer APK
+        // is then an update (uid stays stable) instead of a reinstall (new
+        // uid, KernelSU grant lost).
+        create("ci-debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         create("release") {
             uploadKey?.let {
                 storeFile = rootProject.file(it.getProperty("storeFile"))
@@ -64,7 +74,10 @@ android {
 
     buildTypes {
         // en-XA and ar-XB: text that stays plain English or left-to-right there isn't in res/ yet.
-        debug { isPseudoLocalesEnabled = true }
+        debug {
+            isPseudoLocalesEnabled = true
+            signingConfig = signingConfigs.getByName("ci-debug")
+        }
         release {
             // Shrinks the APK and drops what the app doesn't use, like the owl module's unused parts.
             isMinifyEnabled = true

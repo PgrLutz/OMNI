@@ -14,6 +14,10 @@ fastlane/report.xml
 fastlane/README.md
 *.jks
 *.keystore
+# The debug keystore is checked in ON PURPOSE (well-known android password):
+# CI and local debug builds share one signature so installing a newer APK is
+# an update, not a reinstall (uid churn loses the KernelSU grant).
+!debug.keystore
 keystore.properties
 # captured by scripts/collage-captures.sh
 store/collage/raw/
