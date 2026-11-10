@@ -46,7 +46,7 @@ class GuestShell(
                     // The active chroot backend: one command per line over the
                     // persistent session bridge (or a one-shot when the bridge
                     // is not connected). Output lines go through onLine.
-                    dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot branch cmd=${command.take(40)}")
+                    dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot branch cmd=${command.take(120)}")
                     val out = StringBuilder()
                     val code =
                         runCatching { guest.run(command, onLine = { out.appendLine(it) }, timeoutSeconds = timeoutSeconds) }
@@ -54,7 +54,7 @@ class GuestShell(
                                 dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot run threw: ${it.message}")
                                 return@withContext ShellResult("", it.message ?: "guest command failed", -1)
                             }
-                    dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot result code=$code out=${out.toString().take(40).trimEnd()}")
+                    dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot result code=$code out=${out.toString().take(400).trimEnd()}")
                     return@withContext ShellResult(out.toString().trimEnd(), "", code)
                 }
                 runCatching { exec(command, timeoutSeconds) }.getOrElse {

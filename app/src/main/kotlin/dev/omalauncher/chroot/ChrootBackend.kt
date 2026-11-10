@@ -91,8 +91,19 @@ class ChrootBackend(
         // SELinux must be permissive for GUI apps: the Wayland server
         // (untrusted_app) cannot read shm memfds created by guest-root
         // processes while enforcing (prepare() calls setenforce 0).
-        val ok = runCatching { bridge.send("nohup $command >/dev/null 2>&1 &", timeoutSeconds = 10).exitCode == 0 }.getOrElse { false }
+        // stderr lands in a guest-side launch log (bound XDG dir), so a dying
+        // app leaves a readable trace instead of swallowing its error.
+        val ok = runCatching { bridge.send("nohup $command >/dev/null 2>$runtimeDirGuest/launch.log &", timeoutSeconds = 10).exitCode == 0 }.getOrElse { false }
         ChrootLog.log("launchDetached ok=$ok: ${command.take(80)}")
+        // A beat later, surface the app's stderr if any (first failure lines).
+        Thread {
+            try {
+                Thread.sleep(1500)
+                val err = runCatching { File(stateDir, "xdg/launch.log").readText().trim() }.getOrNull().orEmpty()
+                if (err.isNotEmpty()) ChrootLog.log("launch stderr: ${err.take(600)}")
+            } catch (_: Throwable) {
+            }
+        }.start()
         return ok
     }
 
