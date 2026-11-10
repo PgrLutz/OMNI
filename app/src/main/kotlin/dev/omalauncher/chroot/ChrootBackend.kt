@@ -116,36 +116,38 @@ class ChrootBackend(
         // the sandbox hides su from un-allowlisted uids, so neither stat nor
         // the order can be trusted — the exec probe decides. A throw (exec
         // denied) must become a concrete state, never a silent stuck-Checking.
+        val rootfsTest = "test -d ${shellQuote(config.rootfs)} && echo ok"
+        // A transport only counts once it BOTH answers as root AND can read the
+        // rootfs: this app's su sometimes answers uid=0 in a SELinux context
+        // that cannot traverse Termux's private dirs (silent deny, no output).
+        suspend fun directWorks(candidate: String): Boolean {
+            val e = SuEscalator(candidate)
+            val ok = runCatching { probeRoot(e) && drain(e, rootfsTest, 10).first == 0 }.getOrElse { false }
+            if (!ok) ChrootLog.log("direct su $candidate rejected (root or rootfs probe)")
+            return ok
+        }
+        suspend fun termuxWorks(): Boolean {
+            val te = TermuxEscalator(context)
+            val ok = runCatching { probeRoot(te) && drain(te, rootfsTest, 10).first == 0 }.getOrElse { false }
+            if (!ok) ChrootLog.log("Termux transport rejected (root or rootfs probe)")
+            return ok
+        }
         val esc =
-            config.suCandidates
-                .filter { it.isNotBlank() }
-                .firstNotNullOfOrNull { candidate ->
-                    val e = SuEscalator(candidate)
-                    runCatching { probeRoot(e) }.getOrElse { false }.takeIf { it }?.let { e }
-                }
-                ?: runCatching {
-                    // Under an ephemeral root the kernel hides su from uids it
-                    // snapshotted before their install; Termux's own uid is
-                    // allowlisted and stable, so escalate through it instead —
-                    // the original design.
-                    val te = TermuxEscalator(context)
-                    if (probeRoot(te)) te else null
-                }.getOrNull()
-                ?: return fail(
+            config.suCandidates.filter { it.isNotBlank() }.firstOrNull { directWorks(it) }?.let(::SuEscalator)
+                ?: if (termuxWorks()) TermuxEscalator(context)
+                else return fail(
                     BackendState.PrivilegeUnavailable(
-                        "no privilege escalation: direct su is hidden from this app's uid, and Termux RUN_COMMAND did not answer as root (allow Termux:API in Settings → Termux first)",
+                        "no privilege escalation can read the rootfs: direct su and Termux RUN_COMMAND both failed (allow Termux:API in Settings → Termux first)",
                     ),
                 )
         termuxMode = esc is TermuxEscalator
         escalator = esc
-        ChrootLog.log("transport: ${if (termuxMode) "Termux RUN_COMMAND" else "direct su"}")
-        val (rootfsOk, rootfsOut, rootfsErr) =
-            runCatching { drain(esc, "test -d ${shellQuote(config.rootfs)} && echo ok", 10) }
-                .getOrElse { return fail(BackendState.PrivilegeUnavailable("escalation exec failed: ${it.message ?: it}")) }
+        ChrootLog.log("transport: ${if (termuxMode) "Termux RUN_COMMAND" else "direct su"} (rootfs readable)")
+        val (rootfsOk, rootfsOut, rootfsErr) = drain(esc, rootfsTest, 10)
         ChrootLog.log("rootfs probe: code=$rootfsOk out=${rootfsOut.trim()} err=${rootfsErr.trim()}")
         if (rootfsOk != 0) {
-            // The probe detail (Permission denied = SELinux on Termux's private
-            // dirs; No such file = wrong path) decides the fix.
+            // Unreachable in practice (the transport was chosen by this probe),
+            // kept for the detail in the reported state.
             val detail = listOfNotNull(rootfsOut, rootfsErr).filter { it.isNotBlank() }.joinToString(" | ").trim()
             return fail(BackendState.RootfsMissing(config.rootfs, detail))
         }
