@@ -998,7 +998,7 @@ class WidgetEngine(
             missing.clear()
             return
         }
-        val out = runCatching { services.shells.run(DependencyCheck.script(packages, bins), 20).out }.getOrElse {
+        val out = runCatching { services.shells.run(DependencyCheck.script(packages, bins, pacman = runtime.pkgManager.arch), 20).out }.getOrElse {
             dev.omalauncher.chroot.ChrootLog.log("checkDependencies: shells.run threw: ${it.message}")
             return
         }

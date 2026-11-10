@@ -168,10 +168,10 @@ class Runtime(
     private val openBridge = OpenBridge(context, guest, onOpenFiles = ::openFiles, onOpenVoice = ::openVoice, onEdit = ::edit)
     val agents = AgentStore(guest, text = { id, arg -> context.getString(id, arg) }, onChanged = ::syncGuest)
     val pacman = Pacman(context, prootGuest)
-    // Widgets are the NEXT migration group: their command path is the proot
-    // shell protocol, so they stay on the legacy guest until that group is
-    // adapted to the chroot pool. Their files follow the legacy rootfs too.
-    val widgets = WidgetEngine(context, prootGuest, this)
+    // Widgets run on the ACTIVE guest: commands through the chroot bridge when
+    // the backend is up, the legacy proot pool otherwise. guestFile/runJob/
+    // installs follow the same active guest.
+    val widgets = WidgetEngine(context, guest, this)
 
     /** Widgets' speech(...) and android.speech. */
     val dictation = Dictation(context)
@@ -523,6 +523,10 @@ class Runtime(
             openBridge.start()
             phoneBridge.start()
         }
+        // Activate widgets EARLY, before the fragile guest-write steps: a
+        // failure there must never leave widgets waiting for Linux.
+        widgets.linuxChanged(true)
+        refreshApps()
 
         // A font picked from Linux that wasn't remembered at start (or was installed since) loads now.
         scope.launch { launcherFont.apply() }
@@ -533,13 +537,14 @@ class Runtime(
         // block the rest of the bring-up (provisioner sync, updates).
         runCatching { themes.renderGuest() }
             .onFailure { Log.w(TAG, "renderGuest failed", it) }
-        withContext(Dispatchers.IO) {
-            provisioner.sync()
-            audio.start()
-            synchronized(server) { server.input.setKeymap(proot.keymap.path) }
-            agents.load()
-        }
-        widgets.linuxChanged(true)
+        runCatching {
+            withContext(Dispatchers.IO) {
+                provisioner.sync()
+                audio.start()
+                synchronized(server) { server.input.setKeymap(proot.keymap.path) }
+                agents.load()
+            }
+        }.onFailure { Log.w(TAG, "post-ready sync failed", it) }
         refreshApps()
         withContext(Dispatchers.IO) { updates.load() }
         scope.launch {

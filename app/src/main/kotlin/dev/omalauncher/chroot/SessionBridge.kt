@@ -30,6 +30,9 @@ class SessionBridge(
     private val outFile = File(dir, "bc.out")
     private val quitLine = "__OMARCHY_QUIT__"
 
+    /** One command at a time: the bridge is a single shared command/output stream. */
+    private val sendMutex = kotlinx.coroutines.sync.Mutex()
+
     /** The guest-side bridge loop: one command per line from bc.cmd, output to bc.out. */
     internal fun script(): String =
         """
@@ -81,7 +84,10 @@ class SessionBridge(
      * marker. Output is the bridge's merged stdout+stderr with the `$ line`
      * echo and the marker stripped; capped at 4 MiB.
      */
-    fun send(command: String, timeoutSeconds: Int = 30): CmdResult {
+    fun send(command: String, timeoutSeconds: Int = 30): CmdResult =
+        kotlinx.coroutines.runBlocking { sendMutex.withLock { sendLocked(command, timeoutSeconds) } }
+
+    private fun sendLocked(command: String, timeoutSeconds: Int): CmdResult {
         val deadline = System.currentTimeMillis() + timeoutSeconds * 1000L
         // One line for the bridge; bash blocks need separators but a ';' right
         // after then/else/do/{ is a syntax error, so drop it there.
@@ -128,8 +134,7 @@ class SessionBridge(
         return CmdResult(out.toString().trimEnd(), "", -1)
     }
 
-    /**
-     * Writes [content] to [guestPath] as root through the bridge: the app's
+    /** Writes [content] to [guestPath] as root through the bridge: the app's
      * own uid cannot write the rootfs (SELinux), so guest file provisioning
      * must go through the persistent session. Base64 avoids quoting issues.
      */
