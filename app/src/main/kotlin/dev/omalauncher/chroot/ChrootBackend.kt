@@ -304,4 +304,8 @@ class ChrootBackend(
         val (_, out, _) = drain(esc, "cat /proc/sys/kernel/random/boot_id", 10)
         return out.lines().firstOrNull { it.isNotBlank() } ?: "unknown"
     }
+
+    private companion object {
+        const val TAG = "chroot"
+    }
 }
