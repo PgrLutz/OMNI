@@ -15,7 +15,7 @@ object ChrootLog {
     private var file: File? = null
 
     /** Point the log at the app's files dir; call once at startup. */
-    fun init(filesDir: File) {
+    fun start(filesDir: File) {
         file = File(filesDir, "chroot.log")
         log("=== chroot log started ===")
     }

@@ -328,7 +328,7 @@ class Runtime(
             // presence-guarded, so this never disturbs the legacy flow. A
             // failed prepare only marks its state; Linux stays not-ready.
             Log.i(TAG, "start: preparing the chroot backend")
-            ChrootLog.init(context.filesDir)
+            ChrootLog.start(context.filesDir)
             chrootLifecycle?.prepare()
             Log.i(TAG, "start: chroot prepared")
             // When the chroot becomes Ready the bridges and the Wayland server
