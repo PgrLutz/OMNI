@@ -80,7 +80,7 @@ class ChrootGuest(
     /** Kills the detached stream writer by the recorded pid. */
     fun stopStream(tag: String) {
         val bridge = backend.sessionBridge ?: return
-        val pid = streamOutput("$tag.pid").readTextOrNull()?.trim()
+        val pid = runCatching { streamOutput("$tag.pid").readText().trim() }.getOrNull()
         if (!pid.isNullOrEmpty()) {
             runCatching { bridge.send("kill $pid 2>/dev/null; true", timeoutSeconds = 5) }
             dev.omalauncher.chroot.ChrootLog.log("stream stop tag=$tag pid=$pid")
