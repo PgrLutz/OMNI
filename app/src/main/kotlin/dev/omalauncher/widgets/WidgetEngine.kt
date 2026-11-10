@@ -998,8 +998,12 @@ class WidgetEngine(
             missing.clear()
             return
         }
-        val out = runCatching { services.shells.run(DependencyCheck.script(packages, bins), 20).out }.getOrElse { return }
+        val out = runCatching { services.shells.run(DependencyCheck.script(packages, bins), 20).out }.getOrElse {
+            dev.omalauncher.chroot.ChrootLog.log("checkDependencies: shells.run threw: ${it.message}")
+            return
+        }
         val found = DependencyCheck.parse(out)
+        dev.omalauncher.chroot.ChrootLog.log("checkDependencies: missingPkgs=${found.packages} bins=${found.programs}")
         val missingPkgs = found.packages
         val missingBins = found.programs
         for (spec in specs) {

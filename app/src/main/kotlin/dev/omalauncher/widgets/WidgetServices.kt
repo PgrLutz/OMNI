@@ -201,6 +201,7 @@ class WidgetServices(
         command: String,
         timeoutSeconds: Int,
     ): ShellResult {
+        dev.omalauncher.chroot.ChrootLog.log("widgets.cmd: ${command.take(40)} (${command.length} chars)")
         val now = SystemClock.elapsedRealtime()
         val job =
             synchronized(recent) {
