@@ -861,14 +861,23 @@ class Runtime(
             LaunchTarget.CHROOT -> {
                 val backend = chrootBackend!!
                 thread(name = "guest-launch", isDaemon = true) {
-                    val code =
-                        runCatching {
-                            val process = backend.spawn(command)
-                            runCatching { process.outputStream.close() } // /dev/null stdin, as proot never fed it
-                            drainProcessBlocking(process, Long.MAX_VALUE) { Log.i(TAG, "[${command.take(24)}] $it") }.exitCode
-                        }.getOrElse { -1 }
-                    Log.i(TAG, "exited $code: $command")
-                    onExit()
+                    if (backend.transportIsTermux) {
+                        // The Termux transport has no persistent local process:
+                        // long-running apps (terminal/foot) launch detached in
+                        // the guest and connect to the bound Wayland socket.
+                        val ok = backend.launchDetached(command)
+                        Log.i(TAG, "launch detached=$ok: $command")
+                        onExit()
+                    } else {
+                        val code =
+                            runCatching {
+                                val process = backend.spawn(command)
+                                runCatching { process.outputStream.close() } // /dev/null stdin, as proot never fed it
+                                drainProcessBlocking(process, Long.MAX_VALUE) { Log.i(TAG, "[${command.take(24)}] $it") }.exitCode
+                            }.getOrElse { -1 }
+                        Log.i(TAG, "exited $code: $command")
+                        onExit()
+                    }
                 }
             }
             LaunchTarget.PROOT -> {

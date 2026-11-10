@@ -77,6 +77,22 @@ class ChrootBackend(
         return ok
     }
 
+    /** True when escalation runs through Termux (no persistent local processes). */
+    val transportIsTermux: Boolean get() = termuxMode
+
+    /**
+     * Launches a long-running guest app (terminal/foot) DETACHED through the
+     * bridge: `nohup ... &` returns immediately, so the bridge loop keeps
+     * serving other commands while the app runs and connects to the bound
+     * Wayland socket. False when the bridge is down.
+     */
+    fun launchDetached(command: String): Boolean {
+        val bridge = sessionBridge ?: return false
+        val ok = runCatching { bridge.send("nohup $command >/dev/null 2>&1 &", timeoutSeconds = 10).exitCode == 0 }.getOrElse { false }
+        ChrootLog.log("launchDetached ok=$ok: ${command.take(60)}")
+        return ok
+    }
+
     /** Merges `K=V` pairs into every subsequent guest process's environment. */
     fun updateGuestEnv(env: List<String>) {
         for (pair in env) {
