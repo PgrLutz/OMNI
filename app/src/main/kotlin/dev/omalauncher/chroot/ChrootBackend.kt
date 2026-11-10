@@ -16,6 +16,7 @@ import dev.omalauncher.backend.drainProcessBlocking
 import dev.omalauncher.backend.guestFileFor
 import dev.omalauncher.backend.homeVisibilityCommand
 import dev.omalauncher.backend.shellQuote
+import dev.omalauncher.termux.TermuxEscalator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,10 +38,14 @@ import kotlin.coroutines.coroutineContext
 class ChrootBackend(
     private val config: ChrootConfig,
     stateDir: File,
+    private val context: android.content.Context,
 ) : Backend {
 
     private val _state = MutableStateFlow<BackendState>(BackendState.Checking)
     override val state: StateFlow<BackendState> = _state.asStateFlow()
+
+    /** True when escalation runs through Termux (this app's own su is hidden by the ephemeral-root snapshot). */
+    private var termuxMode = false
 
     override val guestHome: String get() = config.guestHome
 
@@ -54,8 +59,10 @@ class ChrootBackend(
     internal val runtimeConfig: ChrootConfig get() = config
 
     /** A raw guest process (independent pipes, not registered); the caller manages its lifecycle. */
-    fun processBuilder(script: String): ProcessBuilder =
-        requireFactory().spawn(script, cwd = config.guestHome, token = "raw-${UUID.randomUUID()}")
+    fun processBuilder(script: String): ProcessBuilder {
+        check(!termuxMode) { "persistent guest processes need the Termux session bridge (next migration group)" }
+        return requireFactory().spawn(script, cwd = config.guestHome, token = "raw-${UUID.randomUUID()}")
+    }
 
     /** Kills every registered guest process; used by the launcher's own cleanup paths. */
     fun killAll() {
@@ -98,32 +105,39 @@ class ChrootBackend(
         // the sandbox hides su from un-allowlisted uids, so neither stat nor
         // the order can be trusted — the exec probe decides. A throw (exec
         // denied) must become a concrete state, never a silent stuck-Checking.
-        val tried = StringBuilder()
-        var suEsc: SuEscalator? = null
-        for (candidate in config.suCandidates) {
-            if (candidate.isBlank()) continue
-            val e = SuEscalator(candidate)
-            val outcome = runCatching { probeRoot(e) }
-            if (outcome.getOrElse { false }) {
-                suEsc = e
-                break
-            }
-            if (tried.isNotEmpty()) tried.append("; ")
-            tried.append(candidate).append(" → ").append(outcome.exceptionOrNull()?.message ?: "did not answer as root")
-        }
-        val esc = suEsc ?: return@withContext fail(BackendState.PrivilegeUnavailable("no su candidate answered as root: $tried"))
+        val esc =
+            config.suCandidates
+                .filter { it.isNotBlank() }
+                .firstNotNullOfOrNull { candidate ->
+                    val e = SuEscalator(candidate)
+                    runCatching { probeRoot(e) }.getOrElse { false }.takeIf { it }?.let { e }
+                }
+                ?: runCatching {
+                    // Under an ephemeral root the kernel hides su from uids it
+                    // snapshotted before their install; Termux's own uid is
+                    // allowlisted and stable, so escalate through it instead —
+                    // the original design.
+                    val te = TermuxEscalator(context)
+                    if (probeRoot(te)) te else null
+                }.getOrNull()
+                ?: return@withContext fail(
+                    BackendState.PrivilegeUnavailable(
+                        "no privilege escalation: direct su is hidden from this app's uid, and Termux RUN_COMMAND did not answer as root (allow Termux:API in Settings → Termux first)",
+                    ),
+                )
+        termuxMode = esc is TermuxEscalator
+        escalator = esc
         val (rootfsOk, rootfsOut, rootfsErr) =
             runCatching { drain(esc, "test -d ${shellQuote(config.rootfs)} && echo ok", 10) }
-                .getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("su exec failed: ${it.message ?: it}")) }
+                .getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("escalation exec failed: ${it.message ?: it}")) }
         if (rootfsOk != 0) {
             // The probe detail (Permission denied = SELinux on Termux's private
             // dirs; No such file = wrong path) decides the fix.
             val detail = listOfNotNull(rootfsOut, rootfsErr).filter { it.isNotBlank() }.joinToString(" | ").trim()
             return@withContext fail(BackendState.RootfsMissing(config.rootfs, detail))
         }
-        val missingTool = runCatching { missingToolVia(esc) }.getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("su exec failed: ${it.message ?: it}")) }
+        val missingTool = runCatching { missingToolVia(esc) }.getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("escalation exec failed: ${it.message ?: it}")) }
         if (missingTool != null) return@withContext fail(BackendState.HostToolMissing(missingTool.first, missingTool.second))
-        escalator = esc
 
         val (mountState, report) =
             runCatching { MountSupervisor(config, esc).ensureMounted() }
@@ -134,12 +148,14 @@ class ChrootBackend(
         // app-visible rootfs bind). Never fatal.
         runCatching { drain(esc, homeVisibilityCommand(config), 20) }
 
-        val tokens = List(config.shellCount) { "omarchy-${UUID.randomUUID()}" }
         val factory = ProcessFactory(config, esc)
-        val registry = ProcessRegistry(esc, config.hostTools.ps)
         this@ChrootBackend.factory = factory
-        this@ChrootBackend.registry = registry
-        pool = ChrootShellPool(tokens.map { ChrootShell(config, factory, registry, it) })
+        if (!termuxMode) {
+            val tokens = List(config.shellCount) { "omarchy-${UUID.randomUUID()}" }
+            val registry = ProcessRegistry(esc, config.hostTools.ps)
+            this@ChrootBackend.registry = registry
+            pool = ChrootShellPool(tokens.map { ChrootShell(config, factory, registry, it) })
+        }
 
         MountLedgerFile.write(
             ledgerFile,
@@ -154,6 +170,15 @@ class ChrootBackend(
         timeoutSeconds: Int,
         onLine: (String) -> Unit,
     ): CmdResult = withContext(Dispatchers.IO) {
+        if (termuxMode) {
+            // One-shot through Termux: no local process, so no marker protocol.
+            val f = requireFactory()
+            val esc = escalator ?: error("not prepared")
+            val cmd = f.commandString(f.guestLine("bash --noprofile --norc -c ${shellQuote(script)}", config.guestHome))
+            val (code, out, err) = esc.runToCompletion(cmd, timeoutSeconds.toLong())
+            out.lines().forEach(onLine)
+            return@withContext CmdResult(out, err, code)
+        }
         val f = requireFactory()
         val r = requireRegistry()
         val token = "run-${UUID.randomUUID()}"
@@ -197,6 +222,10 @@ class ChrootBackend(
         timeoutSeconds: Int,
         retry: Boolean,
     ): CmdResult {
+        if (termuxMode) {
+            // No pooled shells over RUN_COMMAND: every command is a fresh one-shot.
+            return run(command, timeoutSeconds) { }
+        }
         val p = pool ?: error("backend not prepared: ${_state.value}")
         return p.run(command, timeoutSeconds, retry)
     }
@@ -220,6 +249,7 @@ class ChrootBackend(
     }
 
     override fun spawn(script: String): Process {
+        check(!termuxMode) { "persistent guest processes need the Termux session bridge (next migration group)" }
         val f = requireFactory()
         val r = requireRegistry()
         val token = "agent-${UUID.randomUUID()}"

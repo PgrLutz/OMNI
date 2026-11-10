@@ -15,9 +15,7 @@ suspend fun drain(
     esc: Escalator,
     command: String,
     timeoutSeconds: Long,
-): Triple<Int, String, String> = withContext(Dispatchers.IO) {
-    drainBlocking(esc, command, timeoutSeconds)
-}
+): Triple<Int, String, String> = esc.runToCompletion(command, timeoutSeconds)
 
 /** Blocking variant of [drain], for non-suspend call sites (process registration). */
 internal fun drainBlocking(

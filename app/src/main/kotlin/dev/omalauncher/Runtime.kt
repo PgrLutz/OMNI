@@ -111,7 +111,7 @@ class Runtime(
      */
     val chrootBackend: ChrootBackend? by lazy {
         val config = BackendSelector.runtimeConfig(context.filesDir)
-        if (BackendSelector.canUseChroot(config)) ChrootBackend(config, context.filesDir) else null
+        if (BackendSelector.canUseChroot(config)) ChrootBackend(config, context.filesDir, context) else null
     }
 
     /** Idempotent prepare/close for the chroot backend, keyed to [start]. */

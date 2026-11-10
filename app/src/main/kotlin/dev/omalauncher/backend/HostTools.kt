@@ -1,6 +1,8 @@
 package dev.omalauncher.backend
 
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** [s] as one single-quoted shell word, safe against embedded quotes and spaces. */
 fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
@@ -67,6 +69,15 @@ interface Escalator {
 
     /** A [ProcessBuilder] that runs [commandLine] as root, stderr separate from stdout. */
     fun spawn(commandLine: String): ProcessBuilder
+
+    /**
+     * Runs [commandLine] as root to completion without a local process — the
+     * Termux transport uses RUN_COMMAND (whose uid is allowlisted and stable,
+     * unlike this app's own uid under an ephemeral root). The default runs
+     * the local [spawn] process, as before.
+     */
+    suspend fun runToCompletion(commandLine: String, timeoutSeconds: Long): Triple<Int, String, String> =
+        withContext(Dispatchers.IO) { drainBlocking(this@Escalator, commandLine, timeoutSeconds) }
 }
 
 /** Escalates through `su -c <command line>`, KernelSU's interface. */

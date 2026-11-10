@@ -61,6 +61,19 @@ class ProcessFactory(
         token: String? = null,
     ): ProcessBuilder = ProcessBuilder(argv(guestLine("bash --noprofile --norc -c ${shellQuote(script)}", cwd), token))
 
+    /**
+     * The escalated command STRING for [line] (without a local process): the
+     * Termux transport runs exactly this through RUN_COMMAND.
+     */
+    fun commandString(
+        line: String,
+        token: String? = null,
+    ): String {
+        val env = guestEnv(token).joinToString(" ")
+        return "exec chroot ${shellQuote(config.rootfs)} /usr/bin/env -i $env " +
+            shellQuote("/bin/bash") + " -c " + shellQuote(line)
+    }
+
     /** A persistent protocol shell driven through stdin. */
     fun spawnShell(
         cwd: String? = null,
