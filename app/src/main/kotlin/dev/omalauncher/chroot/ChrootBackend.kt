@@ -93,7 +93,7 @@ class ChrootBackend(
         // processes while enforcing (prepare() calls setenforce 0).
         // stderr lands in a guest-side launch log (bound XDG dir), so a dying
         // app leaves a readable trace instead of swallowing its error.
-        val ok = runCatching { bridge.send("nohup $command >/dev/null 2>$runtimeDirGuest/launch.log &", timeoutSeconds = 10).exitCode == 0 }.getOrElse { false }
+        val ok = runCatching { bridge.send("nohup $command >/dev/null 2>${config.runtimeDirGuest}/launch.log &", timeoutSeconds = 10).exitCode == 0 }.getOrElse { false }
         ChrootLog.log("launchDetached ok=$ok: ${command.take(80)}")
         // A beat later, surface the app's stderr if any (first failure lines).
         Thread {
