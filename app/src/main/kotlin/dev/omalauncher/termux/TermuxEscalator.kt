@@ -30,7 +30,11 @@ class TermuxEscalator(
 
     override suspend fun runToCompletion(commandLine: String, timeoutSeconds: Long): Triple<Int, String, String> =
         withContext(Dispatchers.IO) {
-            val r = TermuxBackend.run(context, commandLine, timeoutSeconds = timeoutSeconds.coerceIn(1, 120).toInt())
+            // Escalate through Termux's OWN su: Termux's uid is allowlisted, so
+            // its su reaches the ksu domain (which can read Termux's data),
+            // unlike this app's direct su under the ephemeral-root snapshot.
+            val escalated = "su -c ${dev.omalauncher.backend.shellQuote(commandLine)}"
+            val r = TermuxBackend.run(context, escalated, timeoutSeconds = timeoutSeconds.coerceIn(1, 120).toInt())
             Triple(r.exitCode, r.stdout, r.stderr)
         }
 }
