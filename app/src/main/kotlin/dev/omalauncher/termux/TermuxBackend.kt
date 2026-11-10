@@ -151,9 +151,9 @@ object TermuxBackend {
             Result(
                 stdout = stdout,
                 stderr = stderr,
-                exitCode = result.getInt(EXIT_CODE, -1),
-                stdoutTruncated = result.getInt(STDOUT_LENGTH, stdoutBytes) > stdoutBytes,
-                stderrTruncated = result.getInt(STDERR_LENGTH, stderrBytes) > stderrBytes,
+                exitCode = result.getIntCompat(EXIT_CODE, -1),
+                stdoutTruncated = result.getIntCompat(STDOUT_LENGTH, stdoutBytes) > stdoutBytes,
+                stderrTruncated = result.getIntCompat(STDERR_LENGTH, stderrBytes) > stderrBytes,
             )
         } finally {
             pending.remove(id)
@@ -165,6 +165,14 @@ object TermuxBackend {
         pending[id]?.complete(result)
     }
 
+    /** Termux:API has sent some fields as Strings on recent versions; read either. */
+    private fun Bundle.getIntCompat(key: String, default: Int): Int =
+        when (val v = get(key)) {
+            null -> default
+            is Int -> v
+            is String -> v.toIntOrNull() ?: default
+            else -> default
+        }
     internal fun fail(id: Int, error: Throwable) {
         pending[id]?.completeExceptionally(error)
     }

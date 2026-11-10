@@ -326,7 +326,9 @@ class Runtime(
             // The chroot backend prepares independently: mounts are global and
             // presence-guarded, so this never disturbs the legacy flow. A
             // failed prepare only marks its state; Linux stays not-ready.
+            Log.i(TAG, "start: preparing the chroot backend")
             chrootLifecycle?.prepare()
+            Log.i(TAG, "start: chroot prepared")
             // When the chroot becomes Ready the bridges and the Wayland server
             // come up the same way a finished Arch install brings them up.
             scope.launch {
