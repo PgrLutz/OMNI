@@ -122,6 +122,7 @@ class ChrootBackend(
     private var registry: ProcessRegistry? = null
     private var pool: ChrootShellPool? = null
     private var sessionBridge: SessionBridge? = null
+        internal set
 
     suspend fun prepare(): BackendState = withContext(Dispatchers.IO) {
         _state.value = BackendState.Checking
@@ -238,7 +239,10 @@ class ChrootBackend(
             // one-shot through RUN_COMMAND.
             val bridge = sessionBridge
             if (bridge != null) {
-                val result = bridge.send(script, timeoutSeconds)
+                // Timeout is enforced guest-side too: a hung command would
+                // otherwise block the shared bridge loop.
+                val bounded = if (timeoutSeconds >= 300) script else "timeout ${timeoutSeconds}s $script"
+                val result = bridge.send(bounded, timeoutSeconds + 5)
                 result.stdout.lineSequence().forEach(onLine)
                 return@withContext result
             }

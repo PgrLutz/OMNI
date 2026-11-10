@@ -42,10 +42,49 @@ class ChrootGuest(
 
     override fun hostFile(guestPath: String): File = File(rootfs, guestPath.trimStart('/'))
 
-    override fun run(script: String, onLine: (String) -> Unit): Int {
+    /** The Termux transport has no local processes: streams go through the bridge. */
+    val transportIsTermux: Boolean get() = backend.transportIsTermux
+
+    override fun run(script: String, onLine: (String) -> Unit): Int =
+        run(script, onLine, timeoutSeconds = 300)
+
+    fun run(script: String, onLine: (String) -> Unit, timeoutSeconds: Int): Int {
         // One-shot scripts (font lists, checks, installs); the backend bounds them.
-        val result = runBlocking { backend.run(script, timeoutSeconds = 300, onLine = onLine) }
+        val result = runBlocking { backend.run(script, timeoutSeconds = timeoutSeconds, onLine = onLine) }
         return result.exitCode
+    }
+
+    /** App-side view of a stream's output/pid files (the guest sees the bound XDG dir). */
+    fun streamOutput(tag: String): File = File(runtimeDir, tag)
+
+    /**
+     * Starts a long-running guest process DETACHED through the bridge, writing
+     * to <tag>.out in the bound runtime dir (pid recorded in <tag>.pid). The
+     * app tails the file; the pid tells when the writer is gone.
+     */
+    fun streamBackground(command: String, tag: String): Boolean {
+        val bridge = backend.sessionBridge ?: return false
+        val guestOut = "${guestRuntimeDir}/$tag.out"
+        val guestPid = "${guestRuntimeDir}/$tag.pid"
+        val ok =
+            runCatching {
+                bridge.send(
+                    "nohup bash -c ${shellQuote(command)} > $guestOut 2>&1 & echo \$! > $guestPid",
+                    timeoutSeconds = 10,
+                ).exitCode == 0
+            }.getOrElse { false }
+        dev.omalauncher.chroot.ChrootLog.log("stream start ok=$ok tag=$tag")
+        return ok
+    }
+
+    /** Kills the detached stream writer by the recorded pid. */
+    fun stopStream(tag: String) {
+        val bridge = backend.sessionBridge ?: return
+        val pid = streamOutput("$tag.pid").readTextOrNull()?.trim()
+        if (!pid.isNullOrEmpty()) {
+            runCatching { bridge.send("kill $pid 2>/dev/null; true", timeoutSeconds = 5) }
+            dev.omalauncher.chroot.ChrootLog.log("stream stop tag=$tag pid=$pid")
+        }
     }
 
     override fun process(script: String): ProcessBuilder = backend.processBuilder(script)

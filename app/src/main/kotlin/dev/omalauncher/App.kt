@@ -10,6 +10,9 @@ class App : Application() {
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
+        // The device's IPv6 path is broken (VPN): HttpURLConnection (widget
+        // http() sources) dies on it with "Software caused connection abort".
+        System.setProperty("java.net.preferIPv4Stack", "true")
         AppLanguage.load(this, base)
     }
 

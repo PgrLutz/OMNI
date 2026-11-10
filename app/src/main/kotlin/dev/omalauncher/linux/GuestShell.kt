@@ -49,7 +49,7 @@ class GuestShell(
                     dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot branch cmd=${command.take(40)}")
                     val out = StringBuilder()
                     val code =
-                        runCatching { guest.run(command) { out.appendLine(it) } }
+                        runCatching { guest.run(command, timeoutSeconds = timeoutSeconds) { out.appendLine(it) } }
                             .getOrElse {
                                 dev.omalauncher.chroot.ChrootLog.log("guest-shell: chroot run threw: ${it.message}")
                                 return@withContext ShellResult("", it.message ?: "guest command failed", -1)

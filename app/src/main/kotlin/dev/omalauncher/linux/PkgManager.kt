@@ -43,6 +43,7 @@ internal val APT_ALIASES: Map<String, String> =
         "ttf-jetbrains-mono" to "fonts-jetbrains-mono",
         "ttf-nerd-fonts-symbols-mono" to "fonts-noto-core",
         "pulseaudio-alsa" to "pulseaudio-utils",
+        "procps-ng" to "procps",
     )
 
 /** `apt-get` one-shot install; no AUR, no guessing package names. */
