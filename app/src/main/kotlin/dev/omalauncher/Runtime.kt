@@ -112,7 +112,12 @@ class Runtime(
      */
     val chrootBackend: ChrootBackend? by lazy {
         val config = BackendSelector.runtimeConfig(context.filesDir)
-        if (BackendSelector.canUseChroot(config)) ChrootBackend(config, context.filesDir, context) else null
+        if (BackendSelector.canUseChroot(config)) {
+            // The app's own SELinux context: GUI guest processes run with it so
+            // the Wayland server can read their shm memfds.
+            val selinuxCtx = runCatching { File("/proc/self/attr/current").readText().trim().trimEnd('\u0000') }.getOrNull()
+            ChrootBackend(config, context.filesDir, context, selinuxCtx)
+        } else null
     }
 
     /** Idempotent prepare/close for the chroot backend, keyed to [start]. */

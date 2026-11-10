@@ -79,6 +79,16 @@ class MountSupervisor(
         // must see the launcher's real files, exactly like proot's dataBinds.
         val dataMounts = ArrayList<String>()
         var dataFailed = false
+        // SELinux fs into the guest: guest tools (runcon) need it to change
+        // domains, which is how GUI processes get the app's context for shm.
+        val selinuxDst = config.rootfs + "/sys/fs/selinux"
+        if (selinuxDst !in MountPlan.parseMounts(readMounts())) {
+            val cmd = "mkdir -p ${shellQuote(selinuxDst)} && ${shellQuote(config.hostTools.mount)} --bind /sys/fs/selinux ${shellQuote(selinuxDst)}"
+            val (code, out, err) = drain(esc, cmd, 60)
+            log += listOfNotNull("$ $cmd", out.takeIf { it.isNotBlank() }, err.takeIf { it.isNotBlank() }, "exit $code")
+            if (selinuxDst !in MountPlan.parseMounts(readMounts())) dataFailed = true
+        }
+        dataMounts += selinuxDst
         for ((guestPath, source) in config.launcherDataBinds) {
             val dst = config.rootfs + guestPath
             if (dst !in MountPlan.parseMounts(readMounts())) {
