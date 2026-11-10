@@ -102,7 +102,7 @@ class SessionBridge(
                 code = line.removePrefix(marker).trim().toIntOrNull() ?: -1
                 return CmdResult(out.toString().trimEnd(), "", code)
             }
-            if (line == "$ $command" || line.startsWith("$ ")) continue
+            if (line == "\$ $command" || line.startsWith("\$ ")) continue
             if (out.length < cap) out.appendLine(line)
         }
         return CmdResult(out.toString().trimEnd(), "", if (code >= 0) code else -1)
