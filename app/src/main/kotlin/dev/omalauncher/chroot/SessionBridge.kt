@@ -3,20 +3,21 @@ package dev.omalauncher.chroot
 import dev.omalauncher.backend.CmdResult
 import dev.omalauncher.backend.ProcessFactory
 import dev.omalauncher.termux.TermuxBackend
-import java.io.BufferedReader
 import java.io.File
-import java.io.FileOutputStream
-import java.io.FileReader
+import java.io.RandomAccessFile
+import java.nio.charset.StandardCharsets
 
 /**
  * The persistent guest session over the Termux transport.
  *
  * RUN_COMMAND is one-shot, so a long-lived guest shell is started in the
- * BACKGROUND: inside the chroot it creates two FIFOs in /run/user/0 (the
- * app's own xdg dir bound there), holds all four ends, and executes one
- * command per line. The app talks to it through the bind at
- * `<filesDir>/xdg` — its own directory, so no SELinux wall — sending a
- * command line and reading output until the `__OMARCHY_EXIT__<code>` marker.
+ * BACKGROUND: inside the chroot it executes one command per line, appending
+ * output plus an `__OMARCHY_EXIT__<code>` marker to `/run/user/0/bc.out`
+ * (the app's own xdg dir bound there). Commands arrive in a regular file
+ * `bc.cmd` that the APP owns (app_data_file — writable by the app, readable
+ * by root), so no FIFO open-blocking and no SELinux write wall: the app can
+ * only READ the bridge's output file, which the earlier FIFO design could not
+ * guarantee for writes.
  */
 class SessionBridge(
     private val filesDir: File,
@@ -24,112 +25,106 @@ class SessionBridge(
     private val context: android.content.Context?,
 ) {
     private val dir = File(filesDir, "xdg")
-    private val cmdFifo = File(dir, "bc.cmd")
-    private val outFifo = File(dir, "bc.out")
+    private val cmdFile = File(dir, "bc.cmd")
+    private val outFile = File(dir, "bc.out")
     private val quitLine = "__OMARCHY_QUIT__"
 
-    private var writer: FileOutputStream? = null
-    private var reader: BufferedReader? = null
-
-    /** The guest-side bridge loop: one command per line, output until the exit marker. */
+    /** The guest-side bridge loop: one command per line from bc.cmd, output to bc.out. */
     internal fun script(): String =
         """
         set +e
         D=/run/user/0
-        mkdir -p "${'$'}D" && chmod 777 "${'$'}D"
-        mkfifo "${'$'}D/bc.cmd" 2>/dev/null; mkfifo "${'$'}D/bc.out" 2>/dev/null
-        chmod 666 "${'$'}D/bc.cmd" "${'$'}D/bc.out"
-        exec 3>"${'$'}D/bc.out"
-        exec 4<"${'$'}D/bc.cmd"
-        while IFS= read -r line <&4; do
-          if [ "${'$'}line" = "$quitLine" ]; then break; fi
-          printf '%s\n' "${'$'} ${'$'}line" >&3
-          ( eval "${'$'}line" ) >&3 2>&3
-          code=${'$'}?
-          printf '__OMARCHY_EXIT__%s\n' "${'$'}code" >&3
+        : > "${'$'}D/bc.out"; chmod 666 "${'$'}D/bc.out"
+        while true; do
+          if [ -s "${'$'}D/bc.cmd" ]; then
+            line=${'$'}(sed -n '1p' "${'$'}D/bc.cmd")
+            sed -i '1d' "${'$'}D/bc.cmd"
+            if [ "${'$'}line" = "$quitLine" ]; then break; fi
+            printf '%s\n' "${'$'} $line" >> "${'$'}D/bc.out"
+            ( eval "${'$'}line" ) >> "${'$'}D/bc.out" 2>&1
+            printf '__OMARCHY_EXIT__%s\n' "${'$'}?" >> "${'$'}D/bc.out"
+          fi
+          sleep 0.2
         done
-        exec 3>&- 4<&-
         """.trimIndent()
 
-    /** Starts the guest shell in the background and opens both FIFO ends. */
+    /** Starts the guest shell in the background; bc.cmd is created app-side so the app can write it. */
     fun start(timeoutSeconds: Int = 10): Boolean {
         val ctx = context ?: return false
+        // Clear stale state: any older bridge process and its FIFO/files.
+        val clean = factory.commandString("pkill -f bc.cmd 2>/dev/null; rm -f /run/user/0/bc.cmd /run/user/0/bc.out; true")
+        runCatching {
+            TermuxBackend.run(ctx, "su -c ${dev.omalauncher.backend.shellQuote(clean)}", timeoutSeconds = 10)
+        }
+        runCatching { outFile.delete(); cmdFile.delete() }
+        runCatching { cmdFile.writeText("") } // app-owned: untrusted_app can write its own file
         val escalated = factory.commandString("bash --noprofile --norc -c " + dev.omalauncher.backend.shellQuote(script()))
         // Through Termux's own su (allowlisted, ksu domain) -> chroot -> bridge.
         TermuxBackend.launchBackground(ctx, "su -c ${dev.omalauncher.backend.shellQuote(escalated)}")
-        return connect(timeoutSeconds)
-    }
-
-    /**
-     * Opens both FIFO ends, READ side first: the bridge's write open on
-     * bc.out completes against our read open, then its read open on bc.cmd
-     * lets our write open complete. Wrong order deadlocks both. Each open
-     * runs on a daemon thread with a timeout (a FIFO open cannot be
-     * interrupted); ENOENT (bridge still starting) retries until the deadline.
-     */
-    private fun connect(timeoutSeconds: Int): Boolean {
+        // Wait until the bridge has created its output file.
         val deadline = System.currentTimeMillis() + timeoutSeconds * 1000L
         while (System.currentTimeMillis() < deadline) {
-            val r = withTimeoutBlocking(deadline - System.currentTimeMillis()) { BufferedReader(FileReader(outFifo)) }
-                ?: return false
-            val w = withTimeoutBlocking(5_000) { FileOutputStream(cmdFifo) }
-            if (w == null) {
-                runCatching { r.close() }
-                return false
-            }
-            reader = r
-            writer = w
-            return true
+            if (outFile.exists() && outFile.canRead()) return true
+            Thread.sleep(200)
         }
-        return false
-    }
-
-    /** Runs [block] on a daemon thread, waiting up to [timeoutMillis]; null on timeout. */
-    private fun <T> withTimeoutBlocking(timeoutMillis: Long, block: () -> T): T? {
-        if (timeoutMillis <= 0) return null
-        val task = java.util.concurrent.FutureTask(block)
-        val t = Thread(task).apply { isDaemon = true; start() }
-        return try {
-            task.get(timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
-        } catch (e: Exception) {
-            t.interrupt()
-            null
-        }
+        return outFile.exists()
     }
 
     /**
-     * Sends one guest command and reads until the exit marker. Output is the
-     * bridge's merged stdout+stderr; the `$ line` echo and the marker are
-     * stripped. Caps output at 4 MiB so a noisy command cannot wedge us.
+     * Appends one guest command to bc.cmd and polls bc.out for the exit
+     * marker. Output is the bridge's merged stdout+stderr with the `$ line`
+     * echo and the marker stripped; capped at 4 MiB.
      */
     fun send(command: String, timeoutSeconds: Int = 30): CmdResult {
-        val w = writer ?: throw IllegalStateException("session bridge not connected")
-        val r = reader ?: throw IllegalStateException("session bridge not connected")
-        w.write(command.replace('\n', ' ').toByteArray())
-        w.write(10) // newline, Int overload
-        w.flush()
-        val out = StringBuilder()
-        var code = -1
         val deadline = System.currentTimeMillis() + timeoutSeconds * 1000L
+        val cmdBytes = (command.replace('\n', ' ') + "\n").toByteArray(StandardCharsets.UTF_8)
+        // Append to the app-owned command file; the bridge consumes line by line.
+        runCatching {
+            RandomAccessFile(cmdFile, "rw").use { raf ->
+                raf.seek(cmdFile.length())
+                raf.write(cmdBytes)
+            }
+        }.getOrElse { return CmdResult("", "cannot write command file: $it", -1) }
+        var readFrom = runCatching { outFile.length() }.getOrElse { 0L }
+        val out = StringBuilder()
         val cap = 4 * 1024 * 1024
         while (System.currentTimeMillis() < deadline) {
-            val line = r.readLine() ?: break
-            val marker = "__OMARCHY_EXIT__"
-            if (line.startsWith(marker)) {
-                code = line.removePrefix(marker).trim().toIntOrNull() ?: -1
-                return CmdResult(out.toString().trimEnd(), "", code)
+            val len = runCatching { outFile.length() }.getOrElse { 0L }
+            if (len > readFrom) {
+                val text =
+                    runCatching {
+                        RandomAccessFile(outFile, "r").use { raf ->
+                            raf.seek(readFrom)
+                            val b = ByteArray((len - readFrom).coerceAtMost(1_000_000).toInt())
+                            raf.readFully(b)
+                            String(b, StandardCharsets.UTF_8)
+                        }
+                    }.getOrElse { null }
+                if (text != null) {
+                    readFrom = len
+                    for (line in text.lineSequence()) {
+                        val marker = "__OMARCHY_EXIT__"
+                        if (line.startsWith(marker)) {
+                            val code = line.removePrefix(marker).trim().toIntOrNull() ?: -1
+                            return CmdResult(out.toString().trimEnd(), "", code)
+                        }
+                        if (line == "\$ $command" || line.startsWith("\$ ")) continue
+                        if (out.length < cap) out.appendLine(line)
+                    }
+                }
             }
-            if (line == "\$ $command" || line.startsWith("\$ ")) continue
-            if (out.length < cap) out.appendLine(line)
+            Thread.sleep(100)
         }
-        return CmdResult(out.toString().trimEnd(), "", if (code >= 0) code else -1)
+        return CmdResult(out.toString().trimEnd(), "", -1)
     }
 
     /** Tells the guest shell to exit; the background RUN_COMMAND then finishes. */
     fun close() {
-        runCatching { writer?.write(quitLine.toByteArray()); writer?.flush() }
-        runCatching { writer?.close(); reader?.close() }
-        writer = null
-        reader = null
+        runCatching {
+            RandomAccessFile(cmdFile, "rw").use { raf ->
+                raf.seek(cmdFile.length())
+                raf.write((quitLine + "\n").toByteArray(StandardCharsets.UTF_8))
+            }
+        }
     }
 }

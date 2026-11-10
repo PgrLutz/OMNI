@@ -4,7 +4,6 @@ import dev.omalauncher.backend.ChrootConfig
 import dev.omalauncher.backend.HostTools
 import dev.omalauncher.backend.ProcessFactory
 import dev.omalauncher.backend.SuEscalator
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -27,26 +26,16 @@ class SessionBridgeTest {
         )
 
     @Test
-    fun `bridge script creates the fifos in the bound runtime dir and holds both ends`() {
+    fun `bridge script consumes one command per line and appends output plus the exit marker`() {
         val s = bridge().script()
         assertTrue(s.contains("D=/run/user/0"))
         assertTrue(s.contains("bc.cmd"))
         assertTrue(s.contains("bc.out"))
-        assertTrue(s.contains("exec 3>"))
-        assertTrue(s.contains("exec 4<"))
+        assertTrue(s.contains("sed -n '1p'"))
+        assertTrue(s.contains("sed -i '1d'"))
         assertTrue(s.contains("__OMARCHY_EXIT__"))
         assertTrue(s.contains("__OMARCHY_QUIT__"))
-    }
-
-    @Test
-    fun `send strips the command echo and parses the exit marker`() {
-        // The bridge's output for `echo hi`:
-        //   $ echo hi
-        //   hi
-        //   __OMARCHY_EXIT__0
-        // send() must drop the echo line and return stdout + the parsed code.
-        val s = bridge().script()
-        assertTrue(s.contains("printf '%s\\n' \"${'$'} ${'$'}line\" >&3"))
-        assertTrue(s.contains("__OMARCHY_EXIT__"))
+        // No FIFO opens: regular files only, so no open-blocking or SELinux wall.
+        assertTrue(!s.contains("mkfifo"))
     }
 }
