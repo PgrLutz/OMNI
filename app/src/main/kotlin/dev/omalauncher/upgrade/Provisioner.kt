@@ -20,7 +20,10 @@ class Provisioner(
     /** Cheap when nothing changed: it only hashes files. Call after anything that changes the desired set. */
     @Synchronized
     fun sync() {
-        runCatching { files.sync(sources.flatMap { it() }) }.onFailure { Log.e("provision", "sync failed", it) }
+        runCatching {
+            dev.omalauncher.chroot.ChrootLog.log("provisioner sync: providers=${sources.size}")
+            files.sync(sources.flatMap { it() })
+        }.onFailure { Log.e("provision", "sync failed", it) }
     }
 
     /** A new rootfs holds none of the recorded files; forget them rather than treat them as deleted by the user. */

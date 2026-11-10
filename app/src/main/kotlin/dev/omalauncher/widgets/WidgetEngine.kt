@@ -1060,7 +1060,12 @@ class WidgetEngine(
 
     /** Agents look for AGENTS.md / CLAUDE.md in the guest home; these point them at the widget docs. */
     fun guestManaged(): List<Managed> {
-        val backend = runtime.chrootBackend
+        val backend =
+            runCatching { runtime.chrootBackend }.getOrElse {
+                ChrootLog.log("guestManaged: chrootBackend access threw: ${it.message}")
+                null
+            }
+        ChrootLog.log("guestManaged: called, chrootBackend=${backend != null}, chroot=${runtime.guest.javaClass.simpleName}")
         if (backend != null) {
             // The app's uid cannot write the Kali rootfs (SELinux), so the
             // guest-side widget files go through the bridge as root — eagerly,
