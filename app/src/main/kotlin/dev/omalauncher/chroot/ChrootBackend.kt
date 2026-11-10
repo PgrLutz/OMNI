@@ -17,6 +17,7 @@ import dev.omalauncher.backend.guestFileFor
 import dev.omalauncher.backend.homeVisibilityCommand
 import dev.omalauncher.backend.shellQuote
 import dev.omalauncher.termux.TermuxEscalator
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -96,6 +97,14 @@ class ChrootBackend(
     private var pool: ChrootShellPool? = null
 
     suspend fun prepare(): BackendState = withContext(Dispatchers.IO) {
+        _state.value = BackendState.Checking
+        val result = prepareInner()
+        Log.i(TAG, "prepare -> ${result::class.simpleName}: ${(result as? BackendState.Failed)?.message}")
+        _state.value = result
+        result
+    }
+
+    private suspend fun prepareInner(): BackendState {
         _state.value = BackendState.Checking
         // The app sandbox cannot stat Termux's private dirs (the Kali rootfs
         // and the host tools live under /data/data/com.termux), so every
