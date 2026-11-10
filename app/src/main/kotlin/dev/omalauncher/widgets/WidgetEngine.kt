@@ -1058,11 +1058,28 @@ class WidgetEngine(
     }
 
     /** Agents look for AGENTS.md / CLAUDE.md in the guest home; these point them at the widget docs. */
-    fun guestManaged(): List<Managed> =
-        listOf("AGENTS.md", "CLAUDE.md").map { Managed.text(File(guest.home, it), Policy.Seeded) { AGENT_POINTER } } +
+    fun guestManaged(): List<Managed> {
+        val backend = runtime.chrootBackend
+        if (backend != null) {
+            // The app's uid cannot write the Kali rootfs (SELinux), so the
+            // guest-side widget files go through the bridge as root — eagerly,
+            // once, at sync time. The legacy Managed path stays for proot.
+            scope.launch {
+                for (name in listOf("AGENTS.md", "CLAUDE.md")) {
+                    backend.writeGuestFile("/root/$name", AGENT_POINTER.toByteArray(), executable = false)
+                }
+                for (bin in listOf("owl-check", "owl-send")) {
+                    val bytes = runCatching { context.assets.open("$bin.sh").use { it.readBytes() } }.getOrNull()
+                    if (bytes != null) backend.writeGuestFile("/usr/local/bin/$bin", bytes, executable = true)
+                }
+            }
+            return emptyList()
+        }
+        return listOf("AGENTS.md", "CLAUDE.md").map { Managed.text(File(guest.home, it), Policy.Seeded) { AGENT_POINTER } } +
             listOf("owl-check", "owl-send").map { bin ->
                 Managed.asset(context, "$bin.sh", File(guest.rootfs, "usr/local/bin/$bin"), Policy.Owned, executable = true)
             }
+    }
 
     companion object {
         /** A store preview screen's `name = value`, up to the next `;` outside quotes. */

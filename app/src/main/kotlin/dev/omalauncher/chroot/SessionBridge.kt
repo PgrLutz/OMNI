@@ -126,6 +126,19 @@ class SessionBridge(
         return CmdResult(out.toString().trimEnd(), "", -1)
     }
 
+    /**
+     * Writes [content] to [guestPath] as root through the bridge: the app's
+     * own uid cannot write the rootfs (SELinux), so guest file provisioning
+     * must go through the persistent session. Base64 avoids quoting issues.
+     */
+    fun writeFile(guestPath: String, content: ByteArray, executable: Boolean = false): Boolean {
+        val b64 = android.util.Base64.encodeToString(content, android.util.Base64.NO_WRAP)
+        val mode = if (executable) "755" else "644"
+        val quoted = dev.omalauncher.backend.shellQuote(guestPath)
+        val cmd = "printf '%s' '$b64' | base64 -d > $quoted && chmod $mode $quoted"
+        return send(cmd, timeoutSeconds = 20).exitCode == 0
+    }
+
     /** Tells the guest shell to exit; the background RUN_COMMAND then finishes. */
     fun close() {
         runCatching {

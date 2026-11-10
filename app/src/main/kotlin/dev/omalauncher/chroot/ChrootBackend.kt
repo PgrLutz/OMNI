@@ -70,6 +70,10 @@ class ChrootBackend(
         registry?.killAll()
     }
 
+    /** Writes a guest file through the bridge (root); false when the bridge is down. */
+    fun writeGuestFile(guestPath: String, content: ByteArray, executable: Boolean = false): Boolean =
+        sessionBridge?.writeFile(guestPath, content, executable) ?: false
+
     /** Merges `K=V` pairs into every subsequent guest process's environment. */
     fun updateGuestEnv(env: List<String>) {
         for (pair in env) {
