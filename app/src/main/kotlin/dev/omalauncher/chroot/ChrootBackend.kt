@@ -98,8 +98,10 @@ class ChrootBackend(
 
     suspend fun prepare(): BackendState = withContext(Dispatchers.IO) {
         _state.value = BackendState.Checking
+        ChrootLog.log("prepare start (termuxMode=$termuxMode)")
         val result = prepareInner()
         Log.i(TAG, "prepare -> ${result::class.simpleName}: ${(result as? BackendState.Failed)?.message}")
+        ChrootLog.log("prepare -> ${result::class.simpleName}: ${(result as? BackendState.Failed)?.message}")
         _state.value = result
         result
     }
@@ -136,9 +138,11 @@ class ChrootBackend(
                 )
         termuxMode = esc is TermuxEscalator
         escalator = esc
+        ChrootLog.log("transport: ${if (termuxMode) "Termux RUN_COMMAND" else "direct su"}")
         val (rootfsOk, rootfsOut, rootfsErr) =
             runCatching { drain(esc, "test -d ${shellQuote(config.rootfs)} && echo ok", 10) }
                 .getOrElse { return@withContext fail(BackendState.PrivilegeUnavailable("escalation exec failed: ${it.message ?: it}")) }
+        ChrootLog.log("rootfs probe: code=$rootfsOk out=${rootfsOut.trim()} err=${rootfsErr.trim()}")
         if (rootfsOk != 0) {
             // The probe detail (Permission denied = SELinux on Termux's private
             // dirs; No such file = wrong path) decides the fix.
@@ -151,7 +155,12 @@ class ChrootBackend(
         val (mountState, report) =
             runCatching { MountSupervisor(config, esc).ensureMounted() }
                 .getOrElse { return@withContext fail(BackendState.MountFailed(listOf("mount escalation failed: ${it.message ?: it}"))) }
-        if (mountState is BackendState.Failed) return@withContext mountState
+        if (mountState is BackendState.Failed) {
+            report.log.forEach { ChrootLog.log("mount: $it") }
+            return@withContext mountState
+        }
+        report.log.forEach { ChrootLog.log("mount: $it") }
+        ChrootLog.log("mounts present=${report.present} byUs=${report.mountedByUs}")
         // Best-effort: make the guest home traversable by the launcher's own
         // uid (it reads .desktop entries, themes and agent state through the
         // app-visible rootfs bind). Never fatal.
@@ -172,6 +181,7 @@ class ChrootBackend(
             ledgerFile,
             MountLedger(config.rootfs, readBootId(esc), System.currentTimeMillis(), report.present, report.mountedByUs, tokens),
         )
+        ChrootLog.log("ledger written, pools=${if (termuxMode) 0 else config.shellCount}")
         _state.value = BackendState.Ready
         BackendState.Ready
     }

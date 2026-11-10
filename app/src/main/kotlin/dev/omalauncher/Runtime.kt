@@ -41,6 +41,7 @@ import dev.omalauncher.linux.shellQuote
 import dev.omalauncher.chroot.BackendLifecycle
 import dev.omalauncher.chroot.BackendSelector
 import dev.omalauncher.chroot.ChrootBackend
+import dev.omalauncher.chroot.ChrootLog
 import dev.omalauncher.chroot.activeBackendReady
 import dev.omalauncher.chroot.launchTarget
 import dev.omalauncher.chroot.LaunchTarget
@@ -327,6 +328,7 @@ class Runtime(
             // presence-guarded, so this never disturbs the legacy flow. A
             // failed prepare only marks its state; Linux stays not-ready.
             Log.i(TAG, "start: preparing the chroot backend")
+            ChrootLog.init(context.filesDir)
             chrootLifecycle?.prepare()
             Log.i(TAG, "start: chroot prepared")
             // When the chroot becomes Ready the bridges and the Wayland server
