@@ -221,7 +221,26 @@ class ChrootBackend(
             val bridge = SessionBridge(stateDir, factory, context)
             val started = runCatching { bridge.start() }.getOrElse { false }
             ChrootLog.log("session bridge started=$started")
-            if (started) sessionBridge = bridge
+            if (started) {
+                sessionBridge = bridge
+                // Keymap for the Wayland seat: the old bootstrap step only ran
+                // for Arch. Generate it here when missing (install xkbcli on
+                // demand), so the seat can map input for GUI apps.
+                val keymapFile = File(stateDir, "keymap.xkb")
+                if (!keymapFile.exists()) {
+                    val k =
+                        runCatching {
+                            bridge.send(
+                                "command -v xkbcli >/dev/null 2>&1 || apt-get install -y xkbcli >/dev/null 2>&1; xkbcli compile-keymap --layout us 2>/dev/null",
+                                timeoutSeconds = 90,
+                            ).stdout
+                        }.getOrNull().orEmpty()
+                    if (k.isNotBlank()) {
+                        runCatching { keymapFile.writeBytes(k.trimEnd().toByteArray() + 0) }
+                        ChrootLog.log("keymap generated: ${k.length} bytes -> $keymapFile")
+                    } else ChrootLog.log("keymap generation failed (no xkbcli output)")
+                } else ChrootLog.log("keymap present: $keymapFile")
+            }
         }
 
         // GUI apps (terminal/foot) need SELinux permissive: the Wayland server
@@ -250,8 +269,9 @@ class ChrootBackend(
             val bridge = sessionBridge
             if (bridge != null) {
                 // Timeout is enforced guest-side too: a hung command would
-                // otherwise block the shared bridge loop.
-                val bounded = if (timeoutSeconds >= 300) script else "timeout ${timeoutSeconds}s $script"
+                // otherwise block the shared bridge loop. Wrapped in bash -c so
+                // scripts starting with an assignment still run.
+                val bounded = if (timeoutSeconds >= 300) script else "timeout ${timeoutSeconds}s bash -c ${shellQuote(script)}"
                 val result = bridge.send(bounded, timeoutSeconds + 5)
                 result.stdout.lineSequence().forEach(onLine)
                 return@withContext result
