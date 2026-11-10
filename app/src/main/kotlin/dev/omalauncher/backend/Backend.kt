@@ -94,8 +94,8 @@ sealed interface BackendState {
     }
 
     /** The root filesystem is not there; [path] is where it was expected. */
-    data class RootfsMissing(val path: String) : Failed {
-        override val message = "rootfs not found at $path"
+    data class RootfsMissing(val path: String, val detail: String = "") : Failed {
+        override val message = "rootfs not found at $path" + if (detail.isBlank()) "" else " ($detail)"
     }
 
     /** A host binary the backend needs is missing; nothing is assumed about Termux. */

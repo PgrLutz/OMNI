@@ -97,8 +97,13 @@ class ChrootBackend(
             ?: return@withContext fail(BackendState.PrivilegeUnavailable("no su candidate in ${config.suCandidates}"))
         val esc = SuEscalator(su)
         if (!probeRoot(esc)) return@withContext fail(BackendState.PrivilegeUnavailable("$su did not answer as root"))
-        val (rootfsOk, _, _) = drain(esc, "test -d ${shellQuote(config.rootfs)} && echo ok", 10)
-        if (rootfsOk != 0) return@withContext fail(BackendState.RootfsMissing(config.rootfs))
+        val (rootfsOk, rootfsOut, rootfsErr) = drain(esc, "test -d ${shellQuote(config.rootfs)} && echo ok", 10)
+        if (rootfsOk != 0) {
+            // The probe detail (Permission denied = SELinux on Termux's private
+            // dirs; No such file = wrong path) decides the fix.
+            val detail = listOfNotNull(rootfsOut, rootfsErr).filter { it.isNotBlank() }.joinToString(" | ").trim()
+            return@withContext fail(BackendState.RootfsMissing(config.rootfs, detail))
+        }
         val missingTool = missingToolVia(esc)
         if (missingTool != null) return@withContext fail(BackendState.HostToolMissing(missingTool.first, missingTool.second))
         escalator = esc
@@ -229,7 +234,7 @@ class ChrootBackend(
     }
 
     private suspend fun probeRoot(esc: dev.omalauncher.backend.Escalator): Boolean {
-        val (code, out, _) = drain(esc, "id", 10)
+        val (code, out, _) = drain(esc, "id -Z; id", 10)
         return code == 0 && out.contains("uid=0")
     }
 
