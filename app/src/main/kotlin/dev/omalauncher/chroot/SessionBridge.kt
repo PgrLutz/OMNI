@@ -41,7 +41,7 @@ class SessionBridge(
             line=${'$'}(sed -n '1p' "${'$'}D/bc.cmd")
             sed -i '1d' "${'$'}D/bc.cmd"
             if [ "${'$'}line" = "$quitLine" ]; then break; fi
-            printf '%s\n' "${'$'} $line" >> "${'$'}D/bc.out"
+            printf '%s\n' "${'$'} ${'$'}line" >> "${'$'}D/bc.out"
             ( eval "${'$'}line" ) >> "${'$'}D/bc.out" 2>&1
             printf '__OMARCHY_EXIT__%s\n' "${'$'}?" >> "${'$'}D/bc.out"
           fi
