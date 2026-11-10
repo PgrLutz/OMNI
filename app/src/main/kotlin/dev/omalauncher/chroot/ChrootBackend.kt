@@ -183,7 +183,7 @@ class ChrootBackend(
         )
         ChrootLog.log("ledger written, pools=${if (termuxMode) 0 else config.shellCount}")
         _state.value = BackendState.Ready
-        BackendState.Ready
+        return BackendState.Ready
     }
 
     override suspend fun run(
