@@ -59,6 +59,21 @@ data class ChrootConfig(
      */
     val appRootfs: String get() = "$stateDir/chroot-rootfs"
 
+    /**
+     * The launcher's data dirs bound into the guest at their proot paths, so
+     * guest tools (owl-check/owl-send, widgets, themes) see the launcher's
+     * real files: guestPath to host-source (relative to the state dir).
+     */
+    val launcherDataBinds: List<Pair<String, String>> get() =
+        listOf(
+            "/root/.local/share/omarchy" to "$stateDir/omarchy",
+            "/root/.config/omalauncher/widgets" to "$stateDir/widgets",
+            "/root/.config/omalauncher/style" to "$stateDir/style",
+            "/root/.config/omalauncher/home" to "$stateDir/home",
+            "/root/.config/omarchy/themes" to "$stateDir/themes",
+            "/root/.config/omarchy/backgrounds" to "$stateDir/backgrounds",
+        )
+
     /** Overrides from any source (prefs, a config file): keys matching field names win. */
     fun withOverrides(map: Map<String, String>): ChrootConfig {
         var out = this

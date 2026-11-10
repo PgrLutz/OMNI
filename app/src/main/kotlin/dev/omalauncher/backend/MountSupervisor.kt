@@ -74,6 +74,24 @@ class MountSupervisor(
         val needed = MountPlan.neededMounts(config.rootfs, config.runtimeDirGuest)
         val present = needed.filter { it in after }
         val mountedByUs = needed.filter { it in after && it !in before }
+        // The launcher's data dirs, bound into the guest at their proot paths
+        // (widgets, style, home, themes, backgrounds, omarchy): guest tools
+        // must see the launcher's real files, exactly like proot's dataBinds.
+        val dataMounts = ArrayList<String>()
+        var dataFailed = false
+        for ((guestPath, source) in config.launcherDataBinds) {
+            val dst = config.rootfs + guestPath
+            if (dst !in MountPlan.parseMounts(readMounts())) {
+                val cmd = launcherDataBindCommand(config, source, dst)
+                val (code, out, err) = drain(esc, cmd, 60)
+                log += listOfNotNull("$ $cmd", out.takeIf { it.isNotBlank() }, err.takeIf { it.isNotBlank() }, "exit $code")
+                if (dst !in MountPlan.parseMounts(readMounts())) dataFailed = true
+            }
+            dataMounts += dst
+        }
+        if (dataFailed) {
+            return BackendState.MountFailed(log + "launcher data binds missing") to Report(emptyList(), emptyList(), log)
+        }
         // Best-effort hosts sync, as the reference entry does; a failure is logged, not fatal.
         if (present.isNotEmpty()) {
             val hosts = "${shellQuote(config.hostTools.cat)} ${shellQuote(config.hostsSource)} > ${shellQuote("${config.rootfs}/etc/hosts")}"
@@ -123,6 +141,11 @@ internal fun appRootfsBindCommand(config: ChrootConfig): String {
     val src = shellQuote(config.rootfs)
     val dst = shellQuote(config.appRootfs)
     return "mkdir -p $dst && ${shellQuote(config.hostTools.mount)} --bind $src $dst"
+}
+
+/** Binds one launcher data dir into the guest at its proot path (mirrors Proot.dataBinds). */
+internal fun launcherDataBindCommand(config: ChrootConfig, source: String, dst: String): String {
+    return "mkdir -p ${shellQuote(source)} ${shellQuote(dst)} && ${shellQuote(config.hostTools.mount)} --bind ${shellQuote(source)} ${shellQuote(dst)}"
 }
 
 /**

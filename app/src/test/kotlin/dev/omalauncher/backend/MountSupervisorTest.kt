@@ -73,4 +73,11 @@ class MountSupervisorTest {
         assertTrue(cmd.contains("chmod 755"))
         assertTrue(cmd.contains("${cfg.rootfs}/root/.local/share/applications"))
     }
+
+    @Test
+    fun `launcher data bind mirrors the launcher dir into the guest at its proot path`() {
+        val cmd = launcherDataBindCommand(config(), "/s/widgets", "${config().rootfs}/root/.config/omalauncher/widgets")
+        assertTrue(cmd.startsWith("mkdir -p '/s/widgets' '${config().rootfs}/root/.config/omalauncher/widgets' &&"))
+        assertTrue(cmd.contains("--bind '/s/widgets' '${config().rootfs}/root/.config/omalauncher/widgets'"))
+    }
 }
