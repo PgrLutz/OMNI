@@ -34,11 +34,22 @@ internal fun updateScriptFor(arch: Boolean): String =
 /** AUR has no APT mapping: a clear failure, never a translated guess. */
 internal fun aurNotSupported(name: String): String = "AUR package \"$name\" has no APT equivalent on Kali; install it manually in the guest."
 
+/** Arch package names mapped to their Debian/Kali equivalents; passthrough otherwise. */
+internal val APT_ALIASES: Map<String, String> =
+    mapOf(
+        "iputils" to "iputils-ping",
+        "fd" to "fd-find",
+        "ttf-dejavu" to "fonts-dejavu-core",
+        "ttf-jetbrains-mono" to "fonts-jetbrains-mono",
+        "ttf-nerd-fonts-symbols-mono" to "fonts-noto-core",
+        "pulseaudio-alsa" to "pulseaudio-utils",
+    )
+
 /** `apt-get` one-shot install; no AUR, no guessing package names. */
 internal fun aptInstallScript(packages: List<String>): String =
     "DEBIAN_FRONTEND=noninteractive apt-get update -qq && " +
         "DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends " +
-        packages.joinToString(" ") { shellQuote(it) }
+        packages.map { APT_ALIASES[it] ?: it }.joinToString(" ") { shellQuote(it) }
 
 internal fun aptUpdateScript(): String =
     "DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y"

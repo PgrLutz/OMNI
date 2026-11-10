@@ -8,6 +8,14 @@ import org.junit.Test
 class PkgManagerTest {
 
     @Test
+    fun `apt install aliases arch package names to their debian equivalents`() {
+        val script = aptInstallScript(listOf("iproute2", "iputils", "fd"))
+        assertTrue(script.contains("'iproute2' 'iputils-ping' 'fd-find'"))
+        assertFalse(script.contains("'iputils'"))
+        assertFalse(script.contains("'fd'"))
+    }
+
+    @Test
     fun `apt install is used for the Kali guest`() {
         val script = aptInstallScript(listOf("git", "curl"))
         assertTrue(script.contains("apt-get update -qq"))

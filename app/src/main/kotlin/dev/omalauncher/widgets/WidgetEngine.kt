@@ -1027,7 +1027,7 @@ class WidgetEngine(
         if (packages.isEmpty() || installs[name] == Install.Running) return
         installs[name] = Install.Running
         scope.launch {
-            val (ok, tail) = runtime.pacman.lock.withLock { withContext(Dispatchers.IO) { guest.runJob(pacmanInstall(packages)) } }
+            val (ok, tail) = runtime.pkgManager.lock.withLock { withContext(Dispatchers.IO) { guest.runJob(runtime.pkgManager.installScript(packages)) } }
             if (ok) installs.remove(name) else installs[name] = Install.Failed(tail.toString())
             // Other widgets may have been waiting on the same packages.
             checkDependencies(specs.toList())
