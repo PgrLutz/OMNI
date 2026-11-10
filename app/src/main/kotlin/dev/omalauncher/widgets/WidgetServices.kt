@@ -166,10 +166,12 @@ class WidgetServices(
     private val scope: CoroutineScope,
 ) : Services {
     /** Sources share a few shells, so one slow command doesn't stall the rest. */
-    val shells = ShellPool(guest, 3)
+    // The ACTIVE guest: widget commands run through the chroot bridge when the
+    // chroot backend is up, the legacy proot pool otherwise.
+    val shells = ShellPool(runtime.guest, 3)
 
     /** Actions get their own shell: a long run(...) never delays widget updates. */
-    private val actionShell = GuestShell(guest)
+    private val actionShell = GuestShell(runtime.guest)
     private val streams = Streams(guest, scope)
 
     /** What's playing on the phone. */

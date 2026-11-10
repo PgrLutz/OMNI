@@ -42,6 +42,16 @@ class GuestShell(
     ): ShellResult =
         mutex.withLock {
             withContext(Dispatchers.IO) {
+                if (guest is ChrootGuest) {
+                    // The active chroot backend: one command per line over the
+                    // persistent session bridge (or a one-shot when the bridge
+                    // is not connected). Output lines go through onLine.
+                    val out = StringBuilder()
+                    val code =
+                        runCatching { guest.run(command) { out.appendLine(it) } }
+                            .getOrElse { return@withContext ShellResult("", it.message ?: "guest command failed", -1) }
+                    return@withContext ShellResult(out.toString().trimEnd(), "", code)
+                }
                 runCatching { exec(command, timeoutSeconds) }.getOrElse {
                     stop()
                     if (!retry) throw it
