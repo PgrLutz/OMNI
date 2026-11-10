@@ -7,7 +7,6 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
 import java.io.FileReader
-import java.io.IOException
 
 /**
  * The persistent guest session over the Termux transport.
@@ -62,23 +61,40 @@ class SessionBridge(
     }
 
     /**
-     * Opens both FIFO ends. The bridge holds the other ends, so these opens
-     * complete once the session is up; retry until the deadline.
+     * Opens both FIFO ends, READ side first: the bridge's write open on
+     * bc.out completes against our read open, then its read open on bc.cmd
+     * lets our write open complete. Wrong order deadlocks both. Each open
+     * runs on a daemon thread with a timeout (a FIFO open cannot be
+     * interrupted); ENOENT (bridge still starting) retries until the deadline.
      */
     private fun connect(timeoutSeconds: Int): Boolean {
         val deadline = System.currentTimeMillis() + timeoutSeconds * 1000L
         while (System.currentTimeMillis() < deadline) {
-            try {
-                val w = FileOutputStream(cmdFifo)
-                val r = BufferedReader(FileReader(outFifo))
-                writer = w
-                reader = r
-                return true
-            } catch (e: IOException) {
-                Thread.sleep(200)
+            val r = withTimeoutBlocking(deadline - System.currentTimeMillis()) { BufferedReader(FileReader(outFifo)) }
+                ?: return false
+            val w = withTimeoutBlocking(5_000) { FileOutputStream(cmdFifo) }
+            if (w == null) {
+                runCatching { r.close() }
+                return false
             }
+            reader = r
+            writer = w
+            return true
         }
         return false
+    }
+
+    /** Runs [block] on a daemon thread, waiting up to [timeoutMillis]; null on timeout. */
+    private fun <T> withTimeoutBlocking(timeoutMillis: Long, block: () -> T): T? {
+        if (timeoutMillis <= 0) return null
+        val task = java.util.concurrent.FutureTask(block)
+        val t = Thread(task).apply { isDaemon = true; start() }
+        return try {
+            task.get(timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (e: Exception) {
+            t.interrupt()
+            null
+        }
     }
 
     /**
