@@ -18,11 +18,15 @@ internal object DependencyCheck {
         packages: Collection<String>,
         programs: Collection<String>,
         pacman: Boolean,
-    ): String =
-        (if (packages.isEmpty() || !pacman) "" else "pacman -T ${packages.joinToString(" ") { shellQuote(it) }} | sed 's/^/pkg /'; ") +
-            (if (packages.isEmpty() || pacman) "" else "for p in ${packages.joinToString(" ") { shellQuote(it) }}; do dpkg-query -W -f='\${Status}' \"\$p\" 2>/dev/null | grep -q '^install ok installed' || echo \"pkg \$p\"; done; ") +
+    ): String {
+        // The check must query the DEBIAN names on Kali, exactly like the
+        // install script aliases them (iputils -> iputils-ping, fd -> fd-find...).
+        val pkgs = if (pacman) packages else packages.map { dev.omalauncher.linux.APT_ALIASES[it] ?: it }
+        return (if (pkgs.isEmpty() || !pacman) "" else "pacman -T ${pkgs.joinToString(" ") { shellQuote(it) }} | sed 's/^/pkg /'; ") +
+            (if (pkgs.isEmpty() || pacman) "" else "for p in ${pkgs.joinToString(" ") { shellQuote(it) }}; do dpkg-query -W -f='\${Status}' \"\$p\" 2>/dev/null | grep -q '^install ok installed' || echo \"pkg \$p\"; done; ") +
             (if (programs.isEmpty()) "" else "for c in ${programs.joinToString(" ") { shellQuote(it) }}; do command -v \"\$c\" >/dev/null || echo \"bin \$c\"; done; ") +
             "true"
+    }
 
     fun parse(out: String): Missing {
         val lines = out.lines().map { it.trim() }
