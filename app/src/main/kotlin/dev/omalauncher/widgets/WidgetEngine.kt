@@ -1009,8 +1009,19 @@ class WidgetEngine(
         for (spec in specs) {
             val p = spec.program ?: continue
             val need = p.requires["pacman"].orEmpty().filter { it in missingPkgs }
-            if (need.isEmpty()) missing.remove(spec.file.name) else missing[spec.file.name] = need
-            if (need.isNotEmpty() && autoInstall.remove(spec.file.name)) installDependencies(spec)
+            // The GATE is the binaries a widget actually runs: a declared
+            // package without an apt equivalent (Arch-only names) must not
+            // block a widget whose tools are already present. Package names
+            // are only the install target, recorded when a needed binary is
+            // missing (with hundreds of widgets, per-recipe mapping is not
+            // viable; the check follows the real capability).
+            val binsMissing = p.programs.filter { it in missingBins }
+            if (binsMissing.isEmpty()) {
+                missing.remove(spec.file.name)
+            } else {
+                missing[spec.file.name] = need
+                if (autoInstall.remove(spec.file.name)) installDependencies(spec)
+            }
             // With declared packages still missing, their programs are expected to be absent.
             val undeclared = if (need.isEmpty()) p.programs.filter { it in missingBins } else emptyList()
             for (bin in undeclared) {
