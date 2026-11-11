@@ -127,6 +127,7 @@ class Client(
         message: String,
     ) {
         Log.w(TAG, "protocol error on $objectId: $message")
+        dev.omalauncher.chroot.ChrootLog.log("wl.client: protocol error on $objectId: $message (disconnecting)")
         send(Event(1, 0).obj(objectId).uint(code).string(message))
         disconnect()
     }
@@ -192,6 +193,7 @@ class Client(
         sent.forEach(Event::releaseFd)
         sent.clear()
         if (ok) return true
+        dev.omalauncher.chroot.ChrootLog.log("wl.client: write failed (broken pipe) — disconnecting")
         disconnect()
         return false
     }
@@ -240,6 +242,7 @@ class Client(
                 len -= pos
             }
         } finally {
+            dev.omalauncher.chroot.ChrootLog.log("wl.client: connection ended (EOF/client closed) — cleaning up")
             disconnect()
             writer.join(1000)
             // A writer still blocked on a client that stopped reading gets woken this way.
