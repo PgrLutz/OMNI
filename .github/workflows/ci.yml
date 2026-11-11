@@ -78,6 +78,9 @@ jobs:
 
       # Release falls back to the debug keystore when no uploadKey is set
       # (app/build.gradle.kts), so this APK installs over the debug one.
+      - name: Fetch proot
+        run: scripts/fetch-proot.sh
+
       - name: Build release APK
         run: ./gradlew :app:assembleRelease
 
