@@ -879,22 +879,34 @@ class WidgetEngine(
     private fun assignments(screen: String) = SCREEN_STATE.findAll(screen).map { it.groupValues[1] to it.groupValues[2].trim() }.toList()
 
     private fun isLive(spec: WidgetSpec): Boolean {
-        if (!missing[spec.file.name].isNullOrEmpty()) return false
+        val name = spec.file.name
+        val log = { reason: String -> dev.omalauncher.chroot.ChrootLog.log("isLive: $name false -> $reason") }
+        if (!missing[spec.file.name].isNullOrEmpty()) {
+            log("missing=${missing[spec.file.name]}")
+            return false
+        }
         // A preview needs real values, even while the home screen is hidden behind the agent's terminal.
         if (spec.file.name in previewing) return true
         // An app in its own task: live while that's showing, whatever home does.
         if ((shownApps[spec.file.name] ?: 0) > 0) return true
         // Over a Linux window too, while home is hidden.
         if (spec.kind == OwlKind.Keybar) return keybarShown > 0
-        if (!visible) return false
+        if (!visible) {
+            log("started=$started")
+            return false
+        }
         // Its screen is open: it's on screen wherever the pages are.
         if (spec.file.name == openScreen) return true
         if (spec.kind == OwlKind.Panel) return spec.file.name in shownPanels || spec.file.name in gesturePanels()
         // Apps have no page to be near.
-        if (!onHome(spec)) return false
+        if (!onHome(spec)) {
+            log("not on home")
+            return false
+        }
         val pages = pages
         val here = pages.indexOf(activePage)
         val there = pages.indexOf(spec.page)
+        dev.omalauncher.chroot.ChrootLog.log("isLive: $name activePage=$activePage page=${spec.page} pages=$pages here=$here there=$there dist=${if (here < 0 || there < 0) "?" else kotlin.math.abs(here - there)}")
         return here < 0 || there < 0 || kotlin.math.abs(here - there) <= 1
     }
 

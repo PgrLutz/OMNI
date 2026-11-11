@@ -814,6 +814,8 @@ class WidgetInstance(
                     var lastWait = 0L
                     var due = true
                     while (isActive) {
+                        val liveNow = active()
+                        if (!liveNow) dev.omalauncher.chroot.ChrootLog.log("source: ${g.name} waiting for active()")
                         snapshotFlow { active() }.first { it }
                         if (g.optional && !linux()) {
                             // Waits for Linux, without a value; the widget reads `linux` to say why.
