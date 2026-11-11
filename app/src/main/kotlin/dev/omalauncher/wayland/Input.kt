@@ -28,12 +28,6 @@ class Input(
     var pointerFocus: Surface? = null
         private set
     var keyboardFocus: Surface? = null
-        set(value) {
-            if (field !== value) {
-                field = value
-                dev.omalauncher.chroot.ChrootLog.log("wl.input: keyboard focus -> ${if (value != null) "surface(${value.client})" else "none"}")
-            }
-        }
 
     private val pressedKeys = linkedSetOf<Int>()
     private var depressedMods = 0
@@ -112,6 +106,7 @@ class Input(
 
     fun setKeyboardFocus(surface: Surface?) {
         if (surface === keyboardFocus || surface?.destroyed == true) return
+        dev.omalauncher.chroot.ChrootLog.log("wl.input: keyboard focus -> ${if (surface != null) "surface(client ${surface.client})" else "none"}")
         // Android doesn't tell a window about keys released after it lost focus; start clean
         // so a key held across the switch isn't swallowed as "already down" next time.
         pressedKeys.clear()
