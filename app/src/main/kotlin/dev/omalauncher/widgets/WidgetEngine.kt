@@ -126,6 +126,42 @@ class WidgetEngine(
             shortcuts.onSave = home::changed
         }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /**
+     * Every ~30 s, writes a one-file snapshot of the widget engine's live state
+     * to <filesDir>/xdg/widget-state.json: what home shows, which page is
+     * active, and per widget: page, dependency gate, install state and the
+     * exact isLive verdict. Readable from Termux like chroot.log.
+     */
+    private val stateDump = scope.launch {
+        while (true) {
+            try {
+                val json = org.json.JSONObject()
+                json.put("ts", System.currentTimeMillis())
+                json.put("visible", visible)
+                json.put("started", started)
+                json.put("activePage", activePage)
+                json.put("pages", org.json.JSONArray(pages))
+                val arr = org.json.JSONArray()
+                for (spec in specs) {
+                    val w = org.json.JSONObject()
+                    w.put("file", spec.file.name)
+                    w.put("kind", spec.kind.name)
+                    w.put("page", spec.page)
+                    w.put("missing", missing[spec.file.name]?.let { org.json.JSONArray(it) } ?: JSONObject.NULL)
+                    w.put("installs", installs[spec.file.name]?.let { it::class.simpleName } ?: JSONObject.NULL)
+                    w.put("live", isLive(spec))
+                    arr.put(w)
+                }
+                json.put("widgets", arr)
+                val target = File(context.filesDir, "xdg/widget-state.json")
+                target.parentFile?.mkdirs()
+                target.writeText(json.toString())
+            } catch (_: Throwable) {
+            }
+            delay(30_000)
+        }
+    }
     private val services = WidgetServices(context, guest, runtime, scope)
 
     /** Opens launcher screens ("style" or "themes", "agents", "drawer"); set by the UI. */
@@ -878,36 +914,44 @@ class WidgetEngine(
     /** A preview screen's `name = value; name = value` pairs; a value is JSON (a quoted string, a number, true) or plain text. */
     private fun assignments(screen: String) = SCREEN_STATE.findAll(screen).map { it.groupValues[1] to it.groupValues[2].trim() }.toList()
 
+    private val liveLogged = HashMap<String, Pair<Boolean, String>>()
+
     private fun isLive(spec: WidgetSpec): Boolean {
         val name = spec.file.name
-        val log = { reason: String -> dev.omalauncher.chroot.ChrootLog.log("isLive: $name false -> $reason") }
-        if (!missing[spec.file.name].isNullOrEmpty()) {
-            log("missing=${missing[spec.file.name]}")
-            return false
+        var reason: String? = null
+        val live =
+            if (!missing[spec.file.name].isNullOrEmpty()) {
+                reason = "missing=${missing[spec.file.name]}"
+                false
+            } else if (spec.file.name in previewing) {
+                true
+            } else if ((shownApps[spec.file.name] ?: 0) > 0) {
+                true
+            } else if (spec.kind == OwlKind.Keybar) {
+                keybarShown > 0
+            } else if (!visible) {
+                reason = "started=$started"
+                false
+            } else if (spec.file.name == openScreen) {
+                true
+            } else if (spec.kind == OwlKind.Panel) {
+                spec.file.name in shownPanels || spec.file.name in gesturePanels()
+            } else if (!onHome(spec)) {
+                reason = "not on home"
+                false
+            } else {
+                val pages = pages
+                val here = pages.indexOf(activePage)
+                val there = pages.indexOf(spec.page)
+                reason = "activePage=$activePage page=${spec.page} pages=$pages dist=${if (here < 0 || there < 0) "?" else kotlin.math.abs(here - there)}"
+                here < 0 || there < 0 || kotlin.math.abs(here - there) <= 1
+            }
+        // Only log a verdict when it changes: the engine polls this often.
+        if (liveLogged[name]?.first != live) {
+            liveLogged[name] = live to (reason ?: "")
+            dev.omalauncher.chroot.ChrootLog.log("isLive: $name -> ${if (live) "live" else "paused"} ${reason ?: ""}")
         }
-        // A preview needs real values, even while the home screen is hidden behind the agent's terminal.
-        if (spec.file.name in previewing) return true
-        // An app in its own task: live while that's showing, whatever home does.
-        if ((shownApps[spec.file.name] ?: 0) > 0) return true
-        // Over a Linux window too, while home is hidden.
-        if (spec.kind == OwlKind.Keybar) return keybarShown > 0
-        if (!visible) {
-            log("started=$started")
-            return false
-        }
-        // Its screen is open: it's on screen wherever the pages are.
-        if (spec.file.name == openScreen) return true
-        if (spec.kind == OwlKind.Panel) return spec.file.name in shownPanels || spec.file.name in gesturePanels()
-        // Apps have no page to be near.
-        if (!onHome(spec)) {
-            log("not on home")
-            return false
-        }
-        val pages = pages
-        val here = pages.indexOf(activePage)
-        val there = pages.indexOf(spec.page)
-        dev.omalauncher.chroot.ChrootLog.log("isLive: $name activePage=$activePage page=${spec.page} pages=$pages here=$here there=$there dist=${if (here < 0 || there < 0) "?" else kotlin.math.abs(here - there)}")
-        return here < 0 || there < 0 || kotlin.math.abs(here - there) <= 1
+        return live
     }
 
     private fun compile(

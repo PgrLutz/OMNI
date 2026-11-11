@@ -27,6 +27,14 @@ object ChrootLog {
     fun log(line: String) {
         val f = file ?: return
         runCatching {
+            // Rotate at ~2 MB so the log stays readable and Termux cat is fast.
+            if (f.length() > 2 * 1024 * 1024) {
+                val rotated = File(f.parentFile, f.name + ".1")
+                f.copyTo(rotated, overwrite = true)
+                f.delete()
+                log("=== chroot log rotated ===")
+                return
+            }
             val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
             f.appendText("$stamp $line\n")
         }
