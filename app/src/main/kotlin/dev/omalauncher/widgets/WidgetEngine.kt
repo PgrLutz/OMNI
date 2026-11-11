@@ -148,8 +148,8 @@ class WidgetEngine(
                     w.put("file", spec.file.name)
                     w.put("kind", spec.kind.name)
                     w.put("page", spec.page)
-                    w.put("missing", missing[spec.file.name]?.let { org.json.JSONArray(it) } ?: JSONObject.NULL)
-                    w.put("installs", installs[spec.file.name]?.let { it::class.simpleName } ?: JSONObject.NULL)
+                    w.put("missing", missing[spec.file.name]?.let { org.json.JSONArray(it) } ?: org.json.JSONObject.NULL)
+                    w.put("installs", installs[spec.file.name]?.let { it::class.simpleName } ?: org.json.JSONObject.NULL)
                     w.put("live", isLive(spec))
                     arr.put(w)
                 }
