@@ -147,15 +147,28 @@ class TerminalFont(
         if (density == 0f) return
         size = pointSize(density, fontScale, scale, em)
         val content = "[main]\nfont=$family:size=${format(size)}\n"
-        val file = File(guest.home, PATH.removePrefix("~/"))
-        if (content == written && file.isFile) return
-        written = content
-        runCatching {
-            file.parentFile?.mkdirs()
-            file.writeText(content)
-        }.onFailure {
+        // The chroot rootfs is not writable by the app (SELinux): the file
+        // goes through the session bridge as root. The direct path stays for
+        // the legacy proot guest, whose rootfs is the app's own data.
+        val ok =
+            if (guest is dev.omalauncher.linux.ChrootGuest) {
+                dev.omalauncher.chroot.ChrootLog.log("terminalFont: writing via bridge")
+                guest.writeGuestFile(dev.omalauncher.linux.TerminalFont.PATH.removePrefix("~/").let { "/root/$it" }, content)
+            } else {
+                val file = File(guest.home, PATH.removePrefix("~/"))
+                if (content == written && file.isFile) return
+                written = content
+                runCatching {
+                    file.parentFile?.mkdirs()
+                    file.writeText(content)
+                }.onFailure {
+                    written = null
+                    Log.w(TAG, "can't write the terminal font", it)
+                }.isSuccess
+            }
+        if (!ok) {
             written = null
-            Log.w(TAG, "can't write the terminal font", it)
+            dev.omalauncher.chroot.ChrootLog.log("terminalFont: bridge write failed")
         }
     }
 

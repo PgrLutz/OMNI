@@ -54,6 +54,10 @@ class ChrootGuest(
         return result.exitCode
     }
 
+    /** Writes a guest file as root through the bridge (the app can't write the rootfs). */
+    fun writeGuestFile(guestPath: String, content: String, executable: Boolean = false): Boolean =
+        backend.writeGuestFile(guestPath, content.toByteArray(), executable)
+
     /** The same as [run] but keeps stderr and the exit code, for widget failure reporting. */
     fun runResult(script: String, timeoutSeconds: Int, onLine: (String) -> Unit): dev.omalauncher.backend.CmdResult =
         runBlocking { backend.run(script, timeoutSeconds = timeoutSeconds, onLine = onLine) }
