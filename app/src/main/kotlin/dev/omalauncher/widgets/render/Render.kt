@@ -521,7 +521,7 @@ private fun LazyNodes(
                 Column(verticalArrangement = arrangement, horizontalAlignment = alignment) { Nodes(nodes, env, inst, this) }
             !constraints.hasBoundedHeight -> Grid(Modifier, columns!!, gap) { Nodes(nodes, env, inst, null) }
             columns == null ->
-                LazyColumn(state = listState, verticalArrangement = arrangement, horizontalAlignment = alignment, reverseLayout = reverse) {
+                LazyColumn(state = listState, beyondViewportItemCount = 1, verticalArrangement = arrangement, horizontalAlignment = alignment, reverseLayout = reverse) {
                     slices.forEachIndexed { at, slice ->
                         when (slice) {
                             is Slice.One -> item(key = "$at") { Node(slice.node, env, inst, null) }
@@ -530,7 +530,7 @@ private fun LazyNodes(
                     }
                 }
             else ->
-                LazyVerticalGrid(GridCells.Fixed(columns), state = gridState, verticalArrangement = arrangement, horizontalArrangement = Arrangement.spacedBy(gap), reverseLayout = reverse) {
+                LazyVerticalGrid(GridCells.Fixed(columns), state = gridState, beyondViewportItemCount = 1, verticalArrangement = arrangement, horizontalArrangement = Arrangement.spacedBy(gap), reverseLayout = reverse) {
                     slices.forEachIndexed { at, slice ->
                         when (slice) {
                             is Slice.One -> item(key = "$at") { Node(slice.node, env, inst, null) }
