@@ -46,6 +46,14 @@ internal val APT_ALIASES: Map<String, String> =
         "procps-ng" to "procps",
     )
 
+/**
+ * Arch-only packages with no apt equivalent: widgets declaring them must not
+ * be gated on Kali (apt can't install them; the sources that need them stay
+ * empty, everything else still runs).
+ */
+internal val ARCH_ONLY_PACKAGES: Set<String> =
+    setOf("pacman", "pacman-contrib", "paccache", "yay", "paru", "archlinux-keyring")
+
 /** `apt-get` one-shot install; no AUR, no guessing package names. */
 internal fun aptInstallScript(packages: List<String>): String =
     "DEBIAN_FRONTEND=noninteractive apt-get update -qq && " +

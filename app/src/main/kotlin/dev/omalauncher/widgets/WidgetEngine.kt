@@ -1008,20 +1008,19 @@ class WidgetEngine(
         val missingBins = found.programs
         for (spec in specs) {
             val p = spec.program ?: continue
-            val need = p.requires["pacman"].orEmpty().filter { (dev.omalauncher.linux.APT_ALIASES[it] ?: it) in missingPkgs }
-            // The GATE is the binaries a widget actually runs: a declared
-            // package without an apt equivalent (Arch-only names) must not
-            // block a widget whose tools are already present. Package names
-            // are only the install target, recorded when a needed binary is
-            // missing (with hundreds of widgets, per-recipe mapping is not
-            // viable; the check follows the real capability).
-            val binsMissing = p.programs.filter { it in missingBins }
-            if (binsMissing.isEmpty()) {
-                missing.remove(spec.file.name)
-            } else {
-                missing[spec.file.name] = need
-                if (autoInstall.remove(spec.file.name)) installDependencies(spec)
+            val declared = p.requires["pacman"].orEmpty()
+            // Original engine semantics: the GATE is the DECLARED packages;
+            // undeclared binaries are warnings only (on Arch they all
+            // resolved). The alias keeps apt-installable names out of the
+            // gate; known Arch-only names (pacman, pacman-contrib, yay,
+            // paccache...) never gate a Kali widget — its other sources still
+            // work, and the install button would only fail on them.
+            val need = declared.filter {
+                val resolved = dev.omalauncher.linux.APT_ALIASES[it] ?: it
+                resolved in missingPkgs && resolved !in dev.omalauncher.linux.ARCH_ONLY_PACKAGES
             }
+            if (need.isEmpty()) missing.remove(spec.file.name) else missing[spec.file.name] = need
+            if (need.isNotEmpty() && autoInstall.remove(spec.file.name)) installDependencies(spec)
             // With declared packages still missing, their programs are expected to be absent.
             val undeclared = if (need.isEmpty()) p.programs.filter { it in missingBins } else emptyList()
             for (bin in undeclared) {
@@ -1043,7 +1042,16 @@ class WidgetEngine(
         installs[name] = Install.Running
         scope.launch {
             val (ok, tail) = runtime.pkgManager.lock.withLock { withContext(Dispatchers.IO) { guest.runJob(runtime.pkgManager.installScript(packages)) } }
-            if (ok) installs.remove(name) else installs[name] = Install.Failed(tail.toString())
+            if (ok) {
+                installs.remove(name)
+            } else {
+                // The packages have no equivalent in this guest (Arch-only
+                // names apt can't resolve): don't gate the widget forever on
+                // something that can't install — its other sources still work.
+                missing.remove(name)
+                installs.remove(name)
+                writeError(spec.file, "warning: couldn't install ${packages.joinToString(" ")} on this guest; the sources that need them stay empty", append = true)
+            }
             // Other widgets may have been waiting on the same packages.
             checkDependencies(specs.toList())
         }
