@@ -28,6 +28,12 @@ class Input(
     var pointerFocus: Surface? = null
         private set
     var keyboardFocus: Surface? = null
+        set(value) {
+            if (field !== value) {
+                field = value
+                dev.omalauncher.chroot.ChrootLog.log("wl.input: keyboard focus -> ${if (value != null) "surface(${value.client})" else "none"}")
+            }
+        }
         private set
 
     private val pressedKeys = linkedSetOf<Int>()
@@ -135,7 +141,12 @@ class Input(
     ) {
         if (pressed && !pressedKeys.add(code)) return
         if (!pressed && !pressedKeys.remove(code)) return
-        val focus = keyboardFocus ?: return
+        val focus = keyboardFocus
+        if (focus == null) {
+            if (pressed) dev.omalauncher.chroot.ChrootLog.log("wl.input: key $code DROPPED (no keyboard focus)")
+            return
+        }
+        dev.omalauncher.chroot.ChrootLog.log("wl.input: key $code ${if (pressed) "down" else "up"} -> client ${focus.client}")
         val serial = server.nextSerial()
         val time = now()
         keyboardsOf(focus.client).forEach {

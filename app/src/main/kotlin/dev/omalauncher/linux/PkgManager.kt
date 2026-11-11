@@ -44,6 +44,8 @@ internal val APT_ALIASES: Map<String, String> =
         "ttf-nerd-fonts-symbols-mono" to "fonts-noto-core",
         "pulseaudio-alsa" to "pulseaudio-utils",
         "procps-ng" to "procps",
+        "glibc" to "libc6",
+        "lib32-glibc" to "libc6",
     )
 
 /**
