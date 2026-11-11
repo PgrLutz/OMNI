@@ -541,10 +541,19 @@ class Runtime(
             withContext(Dispatchers.IO) {
                 provisioner.sync()
                 audio.start()
-                synchronized(server) { server.input.setKeymap(proot.keymap.path) }
                 agents.load()
             }
         }.onFailure { Log.w(TAG, "post-ready sync failed", it) }
+        // The seat's keymap must not depend on the fragile sync chain above:
+        // without it the server sends no keymap fd and clients (foot) map
+        // every key to NoSymbol — typing and Enter die silently.
+        runCatching {
+            synchronized(server) { server.input.setKeymap(guest.keymap.path) }
+            dev.omalauncher.chroot.ChrootLog.log("wl keymap set from ${guest.keymap.path}")
+        }.onFailure {
+            Log.w(TAG, "setKeymap failed", it)
+            dev.omalauncher.chroot.ChrootLog.log("wl keymap set FAILED: ${it.message}")
+        }
         refreshApps()
         withContext(Dispatchers.IO) { updates.load() }
         scope.launch {
