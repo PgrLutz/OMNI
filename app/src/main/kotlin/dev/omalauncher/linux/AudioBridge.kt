@@ -92,10 +92,30 @@ class AudioBridge(
             while (!running) Thread.sleep(1000)
             val started = SystemClock.elapsedRealtime()
             val code =
-                if (guest is ChrootGuest) {
-                    // The chroot backend bounds one-shot runs; a daemon must not
-                    // be bounded, so spawn it and wait on the process itself —
-                    // the supervisor restarts it when it exits, as before.
+                if (guest is ChrootGuest && guest.transportIsTermux) {
+                    // RUN_COMMAND cannot hand Java a long-lived Process. Start
+                    // PulseAudio detached through the session bridge and watch
+                    // its guest PID; stop() is observed here and reaps it.
+                    val tag = "pulseaudio"
+                    val command = "exec pulseaudio -n -F /tmp/pulse.pa --daemonize=no --use-pid-file=no --exit-idle-time=-1 --disable-shm=yes"
+                    if (!guest.streamBackground(command, tag)) {
+                        -1
+                    } else {
+                        val pidFile = shellQuote("${guest.guestRuntimeDir}/$tag.pid")
+                        while (running) {
+                            Thread.sleep(2000)
+                            if (!running) break
+                            val alive = runCatching {
+                                guest.run("pid=\$(cat $pidFile 2>/dev/null); [ -n \"\$pid\" ] && kill -0 \"\$pid\" 2>/dev/null") == 0
+                            }.getOrDefault(false)
+                            if (!alive) break
+                        }
+                        guest.stopStream(tag)
+                        if (running) -1 else 0
+                    }
+                } else if (guest is ChrootGuest) {
+                    // Direct su can own a normal Process; only the Termux
+                    // transport needs the file/PID-backed detached path.
                     runCatching { guest.process("exec pulseaudio -n -F /tmp/pulse.pa --daemonize=no --use-pid-file=no --exit-idle-time=-1 --disable-shm=yes").start().waitFor() }.getOrElse { -1 }
                 } else {
                     runCatching {
