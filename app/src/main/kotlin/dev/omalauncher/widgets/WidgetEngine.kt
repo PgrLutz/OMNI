@@ -1019,7 +1019,14 @@ class WidgetEngine(
                 val resolved = dev.omalauncher.linux.APT_ALIASES[it] ?: it
                 resolved in missingPkgs && resolved !in dev.omalauncher.linux.ARCH_ONLY_PACKAGES
             }
-            if (need.isEmpty()) missing.remove(spec.file.name) else missing[spec.file.name] = need
+            if (need.isEmpty()) {
+                missing.remove(spec.file.name)
+                // A failed install can be resolved outside the launcher; once the
+                // package is present, clear its stale retry state as well.
+                if (installs[spec.file.name] !is Install.Running) installs.remove(spec.file.name)
+            } else {
+                missing[spec.file.name] = need
+            }
             if (need.isNotEmpty() && autoInstall.remove(spec.file.name)) installDependencies(spec)
             // With declared packages still missing, their programs are expected to be absent.
             val undeclared = if (need.isEmpty()) p.programs.filter { it in missingBins } else emptyList()
@@ -1045,12 +1052,18 @@ class WidgetEngine(
             if (ok) {
                 installs.remove(name)
             } else {
-                // The packages have no equivalent in this guest (Arch-only
-                // names apt can't resolve): don't gate the widget forever on
-                // something that can't install — its other sources still work.
-                missing.remove(name)
-                installs.remove(name)
-                writeError(spec.file, "warning: couldn't install ${packages.joinToString(" ")} on this guest; the sources that need them stay empty", append = true)
+                // Keep the missing-package gate active. APT may have failed
+                // transiently (network/mirror/lock), and the tile already has
+                // Retry + Fix-with-agent actions for Install.Failed.
+                val output = tail.toList().takeLast(30).joinToString("\n")
+                val detail = buildString {
+                    append("Failed to install ${packages.joinToString(" ")}")
+                    if (output.isNotBlank()) {
+                        append("\n")
+                        append(output)
+                    }
+                }
+                installs[name] = Install.Failed(detail)
             }
             // Other widgets may have been waiting on the same packages.
             checkDependencies(specs.toList())

@@ -7,7 +7,7 @@ import dev.omalauncher.widgets.lang.OwlKind
 
 /** What agents are told about dependencies when they write or change a widget. */
 private const val DEPENDENCIES =
-    "Declare every package the file's commands need in requires { pacman: [...] } and install them with pacman -S --needed."
+    "Declare every external package the file's commands need in requires { pacman: [...] } (the key is part of the Store schema, even on Kali). Do not hard-code pacman or apt install commands: OMNI installs dependencies with the active guest's package manager. Prefer portable commands and graceful fallbacks for Arch-only tools."
 
 /** How agents see their work: they can't see the phone. */
 private const val CHECK =
@@ -96,7 +96,7 @@ fun publishWidgetCommand(
         }
     val prompt =
         "Publish my $what $file to the store at https://github.com/${Market.REPO}. " +
-            "Use the GitHub CLI: install github-cli with pacman and run gh auth login if needed. Read the repo's README for the rules, " +
+            "Use the GitHub CLI: if GitHub CLI (gh) is missing, install it with the active guest package manager (APT on Kali, pacman on Arch), then run gh auth login if needed. Read the repo's README for the rules, " +
             "then fork it and add $place. Its meta needs a description, a version and a license (ask me which license; " +
             "suggest MIT), and it should declare its packages in requires. If the text people read is in one language only, ask me whether to put it in " +
             "strings { } with an English set and that language's, as docs/declarations.md says under Text in more languages. Leave out anything personal: tokens, paths to my files, my " +
