@@ -82,7 +82,7 @@ android {
             // Shrinks the APK and drops what the app doesn't use, like the owl module's unused parts.
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            signingConfig = signingConfigs.getByName(if (uploadKey != null) "release" else "debug")
+            signingConfig = signingConfigs.getByName(if (uploadKey != null) "release" else "ci-debug")
         }
     }
 }
