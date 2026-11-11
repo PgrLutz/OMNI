@@ -28,6 +28,7 @@ class Input(
     var pointerFocus: Surface? = null
         private set
     var keyboardFocus: Surface? = null
+        private set
 
     private val pressedKeys = linkedSetOf<Int>()
     private var depressedMods = 0
