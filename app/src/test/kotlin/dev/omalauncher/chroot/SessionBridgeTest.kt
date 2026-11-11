@@ -26,7 +26,7 @@ class SessionBridgeTest {
         )
 
     @Test
-    fun `bridge script consumes one command per line and appends output plus the exit marker`() {
+    fun `bridge script preserves multiline blocks including blank lines and appends an exit marker`() {
         val s = bridge().script()
         assertTrue(s.contains("D=/run/user/0"))
         assertTrue(s.contains("bc.cmd"))
@@ -35,6 +35,12 @@ class SessionBridgeTest {
         assertTrue(s.contains("sed -i '1d'"))
         assertTrue(s.contains("__OMARCHY_EXIT__"))
         assertTrue(s.contains("__OMARCHY_QUIT__"))
+        // Empty lines are significant in shell blocks and heredocs; never drop them.
+        assertTrue(!s.contains("[ -z \"${'        // No FIFO opens: regular files only, so no open-blocking or SELinux wall.
+        assertTrue(!s.contains("mkfifo"))
+    }
+}
+}line\" ] && continue"))
         // No FIFO opens: regular files only, so no open-blocking or SELinux wall.
         assertTrue(!s.contains("mkfifo"))
     }

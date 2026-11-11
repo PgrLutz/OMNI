@@ -54,7 +54,6 @@ class SessionBridge(
               line=${'$'}(sed -n '1p' "${'$'}D/bc.cmd")
               sed -i '1d' "${'$'}D/bc.cmd"
               if [ "${'$'}line" = "__OMARCHY_END__" ]; then break; fi
-              [ -z "${'$'}line" ] && continue
               block="${'$'}block${'$'}line"${'$'}'\n'
             done
             printf '%s\n' "${'$'} ${'$'}first" >> "${'$'}D/bc.out"
@@ -104,16 +103,18 @@ class SessionBridge(
         val deadline = System.currentTimeMillis() + timeoutSeconds * 1000L
         // The bridge reads a whole block up to the END marker, so multi-line
         // scripts keep their newlines (comments, functions, heredocs).
+        // Take both cursors BEFORE enqueueing: the bridge can finish a fast command
+        // between the append and the first poll, and a later cursor would skip its exit marker.
+        var readFrom = runCatching { outFile.length() }.getOrElse { 0L }
+        var errFrom = runCatching { errFile.length() }.getOrElse { 0L }
         val cmdBytes = (command + "\n" + endLine + "\n").toByteArray(StandardCharsets.UTF_8)
-        // Append to the app-owned command file; the bridge consumes line by line.
+        // Append to the app-owned command file; the bridge consumes the complete block.
         runCatching {
             RandomAccessFile(cmdFile, "rw").use { raf ->
                 raf.seek(cmdFile.length())
                 raf.write(cmdBytes)
             }
         }.getOrElse { return CmdResult("", "cannot write command file: $it", -1) }
-        var readFrom = runCatching { outFile.length() }.getOrElse { 0L }
-        var errFrom = runCatching { errFile.length() }.getOrElse { 0L }
         val out = StringBuilder()
         val cap = 4 * 1024 * 1024
         while (System.currentTimeMillis() < deadline) {
