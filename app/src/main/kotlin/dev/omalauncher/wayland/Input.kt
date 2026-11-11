@@ -34,7 +34,6 @@ class Input(
                 dev.omalauncher.chroot.ChrootLog.log("wl.input: keyboard focus -> ${if (value != null) "surface(${value.client})" else "none"}")
             }
         }
-        private set
 
     private val pressedKeys = linkedSetOf<Int>()
     private var depressedMods = 0
