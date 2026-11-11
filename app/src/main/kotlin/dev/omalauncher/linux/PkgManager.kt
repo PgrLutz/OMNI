@@ -46,6 +46,8 @@ internal val APT_ALIASES: Map<String, String> =
         "procps-ng" to "procps",
         "glibc" to "libc6",
         "lib32-glibc" to "libc6",
+        "android-tools" to "adb",
+        "python" to "python3",
     )
 
 /**
