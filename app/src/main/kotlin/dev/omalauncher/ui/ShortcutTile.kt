@@ -58,7 +58,6 @@ fun ShortcutTile(
     BoxWithConstraints(
         modifier
             .alpha(if (paused) PausedAlpha else 1f)
-            .tileFrame(focused)
             .pointerInput(shortcut.key) { detectTapGestures(onTap = { onTap() }) }
             .padding(4.dp),
     ) {
@@ -69,24 +68,27 @@ fun ShortcutTile(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
         ) {
-            val bmp = icon
-            when {
-                // Bare silhouettes and initials sit on a badge, as in the drawer, so they read on any wallpaper.
-                bare && (mono || bmp == null) ->
-                    IconBadge(iconSize) {
-                        if (bmp != null) {
-                            Image(bmp, spoken, Modifier.size(iconSize * 0.75f), colorFilter = ColorFilter.tint(Palette.accent))
-                        } else {
-                            BasicText(initials(label), style = Mono.copy(color = Palette.accent, fontSize = (iconSize.value * 0.35f).sp))
+            // The frame wraps only the icon; the label sits outside it, under the tile, like a stock launcher.
+            Box(Modifier.tileFrame(focused)) {
+                val bmp = icon
+                when {
+                    // Bare silhouettes and initials sit on a badge, as in the drawer, so they read on any wallpaper.
+                    bare && (mono || bmp == null) ->
+                        IconBadge(iconSize) {
+                            if (bmp != null) {
+                                Image(bmp, spoken, Modifier.size(iconSize * 0.75f), colorFilter = ColorFilter.tint(Palette.accent))
+                            } else {
+                                BasicText(initials(label), style = Mono.copy(color = Palette.accent, fontSize = (iconSize.value * 0.35f).sp))
+                            }
                         }
-                    }
-                bmp != null ->
-                    Image(bmp, spoken, Modifier.size(iconSize), colorFilter = if (mono) ColorFilter.tint(Palette.accent) else null)
-                else ->
-                    // Apps without an icon get their initials.
-                    Box(Modifier.size(iconSize), contentAlignment = Alignment.Center) {
-                        BasicText(initials(label), style = Mono.copy(color = Palette.accent, fontSize = (iconSize.value * 0.45f).sp))
-                    }
+                    bmp != null ->
+                        Image(bmp, spoken, Modifier.size(iconSize), colorFilter = if (mono) ColorFilter.tint(Palette.accent) else null)
+                    else ->
+                        // Apps without an icon get their initials.
+                        Box(Modifier.size(iconSize), contentAlignment = Alignment.Center) {
+                            BasicText(initials(label), style = Mono.copy(color = Palette.accent, fontSize = (iconSize.value * 0.45f).sp))
+                        }
+                }
             }
             if (showLabel) TileLabel(label)
         }
