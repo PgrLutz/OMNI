@@ -379,20 +379,21 @@ private fun BackgroundSection(
     Row(
         Modifier
             .fillMaxWidth()
-            // Some phones (Android Go) have no live wallpaper picker.
-            .clickable(enabled = !store.liveWallpaperActive) { runCatching { context.startActivity(store.liveWallpaperIntent()) } }
+            // Sets the current background as the Android wallpaper, the static way; the live wallpaper service
+            // composites offset on some OEMs (HiOS) across rotations.
+            .clickable { store.setSystemWallpaper() }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (store.liveWallpaperActive) {
-            // SystemUI defers live-wallpaper color changes until the screen turns off.
+            // The live service is still the system wallpaper (set from Settings, or an older build); setting the
+            // static one below replaces it.
             BasicText(
                 stringResource(R.string.style_wallpaper_active),
                 style = Mono.copy(color = Palette.green),
             )
-        } else {
-            BasicText("[ ${stringResource(R.string.style_wallpaper_use)} ]", style = Mono.copy(color = Palette.accent))
         }
+        BasicText("[ ${stringResource(R.string.style_wallpaper_set)} ]", style = Mono.copy(color = Palette.accent))
     }
     removing?.let { file ->
         ConfirmDialog(

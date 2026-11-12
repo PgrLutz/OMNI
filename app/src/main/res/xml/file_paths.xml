@@ -6,6 +6,7 @@
     <files-path name="tmp" path="tmp/" />
     <files-path name="xdg" path="xdg/" />
     <files-path name="omarchy" path="omarchy/" />
+    <files-path name="backgrounds" path="backgrounds/" />
     <files-path name="widgets" path="widgets/" />
     <!-- The phone's storage, at /sdcard in Linux once it's allowed (PhoneStorage). -->
     <external-path name="phone" path="." />

@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.StringRes
+import androidx.core.content.FileProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -193,6 +194,23 @@ class ThemeStore(
     fun liveWallpaperIntent(): Intent =
         Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
             .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(context, OmarchyWallpaperService::class.java))
+
+    /**
+     * Sets the current background as the Android wallpaper, the static way gallery apps do: the system shows a
+     * crop/confirm UI and owns the image from then on. No SET_WALLPAPER permission needed. This avoids the live
+     * wallpaper service, whose surface some OEMs (HiOS) composite offset across rotations.
+     */
+    fun setSystemWallpaper() {
+        val file = background ?: current?.backgrounds()?.firstOrNull() ?: return
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        val intent =
+            Intent(Intent.ACTION_SET_WALLPAPER).apply {
+                data = uri
+                type = "image/*"
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        runCatching { context.startActivity(intent) }.onFailure { Log.e(TAG, "no app handles set-wallpaper", it) }
+    }
 
     /** Whether the Omarchy files on disk are the release this app pins. */
     fun hasCurrentRelease() = release.isCurrent()

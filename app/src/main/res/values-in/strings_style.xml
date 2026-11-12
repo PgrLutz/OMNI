@@ -87,6 +87,7 @@
     <string name="style_add_image">+ gambar</string>
     <string name="style_wallpaper_active">✓ wallpaper android &amp; warna sistem mengikuti tema (warna sistem diperbarui setelah layar mati)</string>
     <string name="style_wallpaper_use">jadikan wallpaper android + warna sistem</string>
+    <string name="style_wallpaper_set">setel sebagai wallpaper android</string>
     <string name="style_remove_background_title">hapus latar belakang?</string>
 
     <string name="style_terminal_hint">untuk terminal yang dibuka mulai sekarang · lebih banyak lewat pacman, misalnya ttf-cascadia-code</string>

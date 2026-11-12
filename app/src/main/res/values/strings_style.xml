@@ -106,6 +106,7 @@
     <string name="style_add_image">+ image</string>
     <string name="style_wallpaper_active">✓ android wallpaper &amp; system colors follow the theme (system colors update after the screen turns off)</string>
     <string name="style_wallpaper_use">use as android wallpaper + system colors</string>
+    <string name="style_wallpaper_set">set as android wallpaper</string>
     <string name="style_remove_background_title">remove background?</string>
 
     <string name="style_terminal_hint">terminals opened from now on · more with pacman, like ttf-cascadia-code</string>
