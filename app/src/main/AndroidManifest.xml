@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     <!-- Android 17+: widgets and Linux reaching 192.168.x and other local addresses. Asked for
          from a row in settings (LocalNetwork.kt). -->
