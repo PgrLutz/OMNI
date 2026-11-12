@@ -52,6 +52,9 @@ class OmarchyWallpaperService : WallpaperService() {
             super.onDestroy()
         }
 
+        private var lastSurfaceW = -1
+        private var lastSurfaceH = -1
+
         override fun onSurfaceChanged(
             holder: SurfaceHolder,
             format: Int,
@@ -61,6 +64,14 @@ class OmarchyWallpaperService : WallpaperService() {
             super.onSurfaceChanged(holder, format, width, height)
             // TEMP diagnostics: half-black live wallpaper after rotation.
             wallpaperDbg(this@OmarchyWallpaperService, "surface=$width x $height visible=$isVisible")
+            // HiOS keeps a stale surface composite across rotations of a live wallpaper (the wallpaper is
+            // drawn full and correct, but the surface is composited offset). Destroying it forces the system
+            // to recreate and re-composite the surface at the new size.
+            if (width != lastSurfaceW || height != lastSurfaceH) {
+                lastSurfaceW = width
+                lastSurfaceH = height
+                runCatching { holder.surface.destroy() }
+            }
             draw()
         }
 
