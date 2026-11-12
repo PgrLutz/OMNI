@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
@@ -68,8 +70,11 @@ fun ShortcutTile(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
         ) {
-            // The frame wraps only the icon; the label sits outside it, under the tile, like a stock launcher.
-            Box(Modifier.tileFrame(focused)) {
+            // The frame fills the cell as before; only the label sits outside it, under the tile.
+            Box(
+                Modifier.weight(1f).fillMaxWidth().tileFrame(focused),
+                contentAlignment = Alignment.Center,
+            ) {
                 val bmp = icon
                 when {
                     // Bare silhouettes and initials sit on a badge, as in the drawer, so they read on any wallpaper.
