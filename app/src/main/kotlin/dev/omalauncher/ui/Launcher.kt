@@ -117,6 +117,7 @@ private fun DesktopScreen(
             // Drawn directly, without a graphics layer: a stale hardware layer after an orientation change left
             // the lower half of the wallpaper black on some devices. One full-screen draw is cheap per frame.
             val orientation = LocalConfiguration.current.orientation
+            val context = LocalContext.current
             Canvas(Modifier.fillMaxSize()) {
                 val src = wallpaperCrop(bmp.width, bmp.height, size.width.toInt(), size.height.toInt(), state.wallpaperOffset)
                 // TEMP diagnostics: log once per canvas size, to pin the half-black wallpaper after rotation.
@@ -124,7 +125,7 @@ private fun DesktopScreen(
                 if (dbgKey != lastWallpaperDbgKey) {
                     lastWallpaperDbgKey = dbgKey
                     wallpaperDbg(
-                        LocalContext.current,
+                        context,
                         "canvas=$dbgKey orient=$orientation bmp=${bmp.width}x${bmp.height} src=${src.left},${src.top},${src.width()},${src.height()} dst=$dbgKey live=${runtime.themes.liveWallpaperActive} offset=${state.wallpaperOffset}",
                     )
                 }
