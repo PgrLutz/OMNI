@@ -182,15 +182,16 @@ private class Grid(
 }
 
 /**
- * How many rows of square-ish cells fit [long] beside [cols] of them across [short]. A window narrower than
- * the gaps around it leaves no room across: one row then, and never more than [MAX_CELL_ASPECT] times [cols],
- * or a sliver would make millions of them.
+ * How many rows of cells fit [long] beside [cols] of them across [short]. Cells are 1.4x as tall as wide:
+ * the extra height holds an app's name under its icon (the icon itself stays full-width). A window narrower
+ * than the gaps around it leaves no room across: one row then, and never more than [MAX_CELL_ASPECT] times
+ * [cols], or a sliver would make millions of them.
  */
 private fun squareRows(
     short: Int,
     long: Int,
     cols: Int,
-) = if (short <= 0) 1 else (long / (short / cols.toFloat())).toInt().coerceIn(1, MAX_CELL_ASPECT * cols)
+) = if (short <= 0) 1 else (long / (short / cols.toFloat() * 1.4f)).toInt().coerceIn(1, MAX_CELL_ASPECT * cols)
 
 /** Cells four times as tall as wide: far past any phone's shape (20:9 makes 13 rows of 6 columns). */
 private const val MAX_CELL_ASPECT = 4
