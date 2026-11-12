@@ -99,6 +99,13 @@ class MountSupervisor(
             }
             dataMounts += dst
         }
+        // The bind sources were mkdir'd as root, so the app uid can't write them; the app adds backgrounds
+        // and themes into these dirs. Made writable every prepare, so a state left root-owned is fixed too.
+        if (config.launcherDataBinds.isNotEmpty()) {
+            val sources = config.launcherDataBinds.joinToString(" ") { shellQuote(it.second) }
+            val (code, out, err) = drain(esc, "chmod 777 $sources 2>/dev/null; echo ok", 20)
+            log += listOfNotNull("$ chmod 777 sources", out.takeIf { it.isNotBlank() }, err.takeIf { it.isNotBlank() }, "exit $code")
+        }
         if (dataFailed) {
             return BackendState.MountFailed(log + "launcher data binds missing") to Report(emptyList(), emptyList(), log)
         }
