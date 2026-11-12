@@ -240,16 +240,14 @@ fun HomeScreen(
     LaunchedEffect(pager, view) {
         val wallpapers = WallpaperManager.getInstance(view.context)
         snapshotFlow {
-            val last = pager.pageCount - 1
-            val offset = if (last <= 0) 0.5f else ((pager.currentPage + pager.currentPageOffsetFraction) / last).coerceIn(0f, 1f)
-            // Also resent when our live wallpaper is picked, which starts out centered.
-            offset to runtime.themes.liveWallpaperActive
-        }.collect { (offset, live) ->
-            state.wallpaperOffset = offset
+            // Wallpaper stays locked: offset pinned to center instead of following the pages.
+            runtime.themes.liveWallpaperActive
+        }.collect { live ->
+            state.wallpaperOffset = 0.5f
             if (live) {
                 view.windowToken?.let {
                     wallpapers.setWallpaperOffsetSteps(if (pager.pageCount > 1) 1f / (pager.pageCount - 1) else 1f, 1f)
-                    wallpapers.setWallpaperOffsets(it, offset, 0.5f)
+                    wallpapers.setWallpaperOffsets(it, 0.5f, 0.5f)
                 }
             }
         }

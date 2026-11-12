@@ -69,8 +69,9 @@ class OmarchyWallpaperService : WallpaperService() {
             xPixelOffset: Int,
             yPixelOffset: Int,
         ) {
-            if (xOffset == this.xOffset) return
-            this.xOffset = xOffset
+            // Wallpaper locked: ignore system offset updates, stay centered.
+            if (0.5f == this.xOffset) return
+            this.xOffset = 0.5f
             if (isVisible) draw()
         }
 
