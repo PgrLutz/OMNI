@@ -65,12 +65,12 @@ class OmarchyWallpaperService : WallpaperService() {
             // TEMP diagnostics: half-black live wallpaper after rotation.
             wallpaperDbg(this@OmarchyWallpaperService, "surface=$width x $height visible=$isVisible")
             // HiOS keeps a stale surface composite across rotations of a live wallpaper (the wallpaper is
-            // drawn full and correct, but the surface is composited offset). Destroying it forces the system
-            // to recreate and re-composite the surface at the new size.
+            // drawn full and correct, but the surface is composited offset). Forcing the fixed size makes
+            // the system re-layout and re-composite the surface at the new size.
             if (width != lastSurfaceW || height != lastSurfaceH) {
                 lastSurfaceW = width
                 lastSurfaceH = height
-                runCatching { holder.surface.destroy() }
+                runCatching { holder.setFixedSize(width, height) }
             }
             draw()
         }
