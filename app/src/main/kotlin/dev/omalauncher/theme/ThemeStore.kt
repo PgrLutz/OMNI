@@ -10,7 +10,6 @@ import android.net.Uri
 import android.util.Log
 import androidx.annotation.StringRes
 import dev.omalauncher.ui.decodeForScreen
-import dev.omalauncher.ui.wallpaperDbg
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -208,8 +207,7 @@ class ThemeStore(
             val bmp = decodeForScreen(file, context) ?: return@withContext
             runCatching {
                 WallpaperManager.getInstance(context).setBitmap(bmp, null, true, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
-                wallpaperDbg(context, "setSystemWallpaper ${file.name} ok")
-            }.onFailure { Log.e(TAG, "setBitmap failed", it); wallpaperDbg(context, "setSystemWallpaper FAILED: ${it.message}") }
+            }.onFailure { Log.e(TAG, "setBitmap failed", it) }
         }
     }
 

@@ -10,7 +10,6 @@ import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -55,8 +54,6 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
-import android.content.Context
-import java.io.File
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import dev.omalauncher.Runtime
@@ -114,21 +111,8 @@ private fun DesktopScreen(
 
     if (!runtime.themes.liveWallpaperActive) {
         runtime.themes.wallpaper?.let { bmp ->
-            // Drawn directly, without a graphics layer: a stale hardware layer after an orientation change left
-            // the lower half of the wallpaper black on some devices. One full-screen draw is cheap per frame.
-            val orientation = LocalConfiguration.current.orientation
-            val context = LocalContext.current
             Canvas(Modifier.fillMaxSize()) {
                 val src = wallpaperCrop(bmp.width, bmp.height, size.width.toInt(), size.height.toInt(), state.wallpaperOffset)
-                // TEMP diagnostics: log once per canvas size, to pin the half-black wallpaper after rotation.
-                val dbgKey = "${size.width.toInt()}x${size.height.toInt()}"
-                if (dbgKey != lastWallpaperDbgKey) {
-                    lastWallpaperDbgKey = dbgKey
-                    wallpaperDbg(
-                        context,
-                        "canvas=$dbgKey orient=$orientation bmp=${bmp.width}x${bmp.height} src=${src.left},${src.top},${src.width()},${src.height()} dst=$dbgKey live=${runtime.themes.liveWallpaperActive} offset=${state.wallpaperOffset}",
-                    )
-                }
                 drawImage(
                     bmp,
                     srcOffset = IntOffset(src.left, src.top),
@@ -462,14 +446,4 @@ private fun Modifier.placedWhile(shown: () -> Boolean): Modifier {
             if (show) placeable.place(0, 0)
         }
     }
-}
-
-/** TEMP diagnostics for the half-black wallpaper after an orientation change; read via su from Termux. */
-private var lastWallpaperDbgKey: String? = null
-
-internal fun wallpaperDbg(
-    context: Context,
-    line: String,
-) {
-    runCatching { File(context.filesDir, "wallpaper-dbg.log").appendText("${System.currentTimeMillis()} $line\n") }
 }
