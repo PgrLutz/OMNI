@@ -62,8 +62,9 @@ fun ShortcutTile(
             .padding(4.dp),
     ) {
         val showLabel = LauncherStyle.style[Style.APP_LABELS] || showsLabel()
-        // A square frame sized to the cell's smaller side, full; the label sits outside it, under the tile.
-        val frameSize = min(maxWidth, maxHeight - if (showLabel) 18.dp else 0.dp)
+        // A square frame the full cell's smaller side; the label sits under it and may overlap into the gap,
+        // like a stock launcher's icon row. No 18dp cut for the label — that's what kept the frame small.
+        val frameSize = min(maxWidth, maxHeight)
         Column(
             Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
