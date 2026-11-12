@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
@@ -63,34 +62,34 @@ fun ShortcutTile(
             .padding(4.dp),
     ) {
         val showLabel = LauncherStyle.style[Style.APP_LABELS] || showsLabel()
-        val iconSize = tileIconSize(showLabel)
         Column(
             Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
         ) {
-            // The frame fills the cell as before; only the label sits outside it, under the tile.
+            // A square frame sized to the cell's smaller side; the label sits outside it, under the tile.
+            val frameSize = tileIconSize(showLabel)
             Box(
-                Modifier.weight(1f).fillMaxWidth().tileFrame(focused),
+                Modifier.size(frameSize).tileFrame(focused),
                 contentAlignment = Alignment.Center,
             ) {
                 val bmp = icon
                 when {
                     // Bare silhouettes and initials sit on a badge, as in the drawer, so they read on any wallpaper.
                     bare && (mono || bmp == null) ->
-                        IconBadge(iconSize) {
+                        IconBadge(iconSize = frameSize * 0.85f) {
                             if (bmp != null) {
-                                Image(bmp, spoken, Modifier.size(iconSize * 0.75f), colorFilter = ColorFilter.tint(Palette.accent))
+                                Image(bmp, spoken, Modifier.size(frameSize * 0.6f), colorFilter = ColorFilter.tint(Palette.accent))
                             } else {
-                                BasicText(initials(label), style = Mono.copy(color = Palette.accent, fontSize = (iconSize.value * 0.35f).sp))
+                                BasicText(initials(label), style = Mono.copy(color = Palette.accent, fontSize = (frameSize.value * 0.3f).sp))
                             }
                         }
                     bmp != null ->
-                        Image(bmp, spoken, Modifier.size(iconSize), colorFilter = if (mono) ColorFilter.tint(Palette.accent) else null)
+                        Image(bmp, spoken, Modifier.size(frameSize * 0.85f), colorFilter = if (mono) ColorFilter.tint(Palette.accent) else null)
                     else ->
                         // Apps without an icon get their initials.
-                        Box(Modifier.size(iconSize), contentAlignment = Alignment.Center) {
-                            BasicText(initials(label), style = Mono.copy(color = Palette.accent, fontSize = (iconSize.value * 0.45f).sp))
+                        Box(Modifier.size(frameSize * 0.85f), contentAlignment = Alignment.Center) {
+                            BasicText(initials(label), style = Mono.copy(color = Palette.accent, fontSize = (frameSize.value * 0.4f).sp))
                         }
                 }
             }
