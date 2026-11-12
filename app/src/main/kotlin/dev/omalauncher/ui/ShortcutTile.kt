@@ -62,8 +62,8 @@ fun ShortcutTile(
             .padding(4.dp),
     ) {
         val showLabel = LauncherStyle.style[Style.APP_LABELS] || showsLabel()
-        // A square frame sized to the cell's smaller side; the label sits outside it, under the tile.
-        val frameSize = tileIconSize(showLabel)
+        // A square frame sized to the cell's smaller side, full; the label sits outside it, under the tile.
+        val frameSize = min(maxWidth, maxHeight - if (showLabel) 18.dp else 0.dp)
         Column(
             Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -78,18 +78,18 @@ fun ShortcutTile(
                 when {
                     // Bare silhouettes and initials sit on a badge, as in the drawer, so they read on any wallpaper.
                     bare && (mono || bmp == null) ->
-                        IconBadge(frameSize * 0.85f) {
+                        IconBadge(frameSize * 0.9f) {
                             if (bmp != null) {
-                                Image(bmp, spoken, Modifier.size(frameSize * 0.6f), colorFilter = ColorFilter.tint(Palette.accent))
+                                Image(bmp, spoken, Modifier.size(frameSize * 0.65f), colorFilter = ColorFilter.tint(Palette.accent))
                             } else {
                                 BasicText(initials(label), style = Mono.copy(color = Palette.accent, fontSize = (frameSize.value * 0.3f).sp))
                             }
                         }
                     bmp != null ->
-                        Image(bmp, spoken, Modifier.size(frameSize * 0.85f), colorFilter = if (mono) ColorFilter.tint(Palette.accent) else null)
+                        Image(bmp, spoken, Modifier.size(frameSize * 0.9f), colorFilter = if (mono) ColorFilter.tint(Palette.accent) else null)
                     else ->
                         // Apps without an icon get their initials.
-                        Box(Modifier.size(frameSize * 0.85f), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(frameSize * 0.9f), contentAlignment = Alignment.Center) {
                             BasicText(initials(label), style = Mono.copy(color = Palette.accent, fontSize = (frameSize.value * 0.4f).sp))
                         }
                 }
