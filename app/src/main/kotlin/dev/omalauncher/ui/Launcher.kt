@@ -111,8 +111,9 @@ private fun DesktopScreen(
 
     if (!runtime.themes.liveWallpaperActive) {
         runtime.themes.wallpaper?.let { bmp ->
-            // Read while drawing, and in its own layer, so swiping pages only redraws this.
-            Canvas(Modifier.fillMaxSize().graphicsLayer()) {
+            // Drawn directly, without a graphics layer: a stale hardware layer after an orientation change left
+            // the lower half of the wallpaper black on some devices. One full-screen draw is cheap per frame.
+            Canvas(Modifier.fillMaxSize()) {
                 val src = wallpaperCrop(bmp.width, bmp.height, size.width.toInt(), size.height.toInt(), state.wallpaperOffset)
                 drawImage(
                     bmp,
