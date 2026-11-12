@@ -202,13 +202,15 @@ class ThemeStore(
      * depend on (some OEMs have no ACTION_SET_WALLPAPER handler), no live wallpaper service, whose surface some
      * OEMs (HiOS) composite offset across rotations.
      */
-    fun setSystemWallpaper() {
+    suspend fun setSystemWallpaper() {
         val file = background ?: current?.backgrounds()?.firstOrNull() ?: return
-        val bmp = decodeForScreen(file, context) ?: return
-        runCatching {
-            WallpaperManager.getInstance(context).setBitmap(bmp, null, true, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
-            wallpaperDbg(context, "setSystemWallpaper ${file.name} ok")
-        }.onFailure { Log.e(TAG, "setBitmap failed", it); wallpaperDbg(context, "setSystemWallpaper FAILED: ${it.message}") }
+        withContext(Dispatchers.IO) {
+            val bmp = decodeForScreen(file, context) ?: return@withContext
+            runCatching {
+                WallpaperManager.getInstance(context).setBitmap(bmp, null, true, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
+                wallpaperDbg(context, "setSystemWallpaper ${file.name} ok")
+            }.onFailure { Log.e(TAG, "setBitmap failed", it); wallpaperDbg(context, "setSystemWallpaper FAILED: ${it.message}") }
+        }
     }
 
     /** Whether the Omarchy files on disk are the release this app pins. */

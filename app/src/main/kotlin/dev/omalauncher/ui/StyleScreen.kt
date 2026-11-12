@@ -381,7 +381,7 @@ private fun BackgroundSection(
             .fillMaxWidth()
             // Sets the current background as the Android wallpaper, the static way; the live wallpaper service
             // composites offset on some OEMs (HiOS) across rotations.
-            .clickable { store.setSystemWallpaper() }
+            .clickable { scope.launch { store.setSystemWallpaper() } }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
