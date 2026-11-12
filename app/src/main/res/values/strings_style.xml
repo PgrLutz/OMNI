@@ -20,6 +20,7 @@
     <string name="style_monochrome">monochrome</string>
     <string name="style_colored">colored</string>
     <string name="style_home_apps">home apps</string>
+    <string name="style_app_labels">app labels</string>
     <string name="style_boxed">boxed</string>
     <string name="style_icon_only">icon only</string>
     <string name="style_recent_apps">recent apps</string>

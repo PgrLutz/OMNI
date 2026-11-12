@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import dev.omalauncher.spokenLabel
+import dev.omalauncher.theme.Style
 import dev.omalauncher.widgets.Shortcut
 
 /**
@@ -61,7 +62,7 @@ fun ShortcutTile(
             .pointerInput(shortcut.key) { detectTapGestures(onTap = { onTap() }) }
             .padding(4.dp),
     ) {
-        val showLabel = showsLabel()
+        val showLabel = LauncherStyle.style[Style.APP_LABELS] || showsLabel()
         val iconSize = tileIconSize(showLabel)
         Column(
             Modifier.fillMaxSize(),

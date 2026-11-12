@@ -16,6 +16,7 @@
     <string name="style_monochrome">monokrom</string>
     <string name="style_colored">berwarna</string>
     <string name="style_home_apps">aplikasi layar utama</string>
+    <string name="style_app_labels">nama aplikasi</string>
     <string name="style_boxed">dalam kotak</string>
     <string name="style_icon_only">ikon saja</string>
     <string name="style_recent_apps">aplikasi yang baru dibuka</string>
