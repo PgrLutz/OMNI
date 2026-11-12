@@ -12,6 +12,7 @@ import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import dev.omalauncher.ui.decodeForScreen
 import dev.omalauncher.ui.wallpaperCrop
+import dev.omalauncher.ui.wallpaperDbg
 import java.util.concurrent.Executors
 
 /**
@@ -58,6 +59,8 @@ class OmarchyWallpaperService : WallpaperService() {
             height: Int,
         ) {
             super.onSurfaceChanged(holder, format, width, height)
+            // TEMP diagnostics: half-black live wallpaper after rotation.
+            wallpaperDbg(this@OmarchyWallpaperService, "surface=$width x $height visible=$isVisible")
             draw()
         }
 
@@ -107,6 +110,8 @@ class OmarchyWallpaperService : WallpaperService() {
                 canvas.drawColor(color("background", Color.BLACK))
                 bitmap?.let { bmp ->
                     val src = wallpaperCrop(bmp.width, bmp.height, canvas.width, canvas.height, xOffset)
+                    // TEMP diagnostics: half-black live wallpaper after rotation.
+                    wallpaperDbg(this@OmarchyWallpaperService, "draw canvas=${canvas.width}x${canvas.height} bmp=${bmp.width}x${bmp.height} src=${src.left},${src.top},${src.width()},${src.height()} dst=${canvas.width}x${canvas.height} xOff=$xOffset")
                     canvas.drawBitmap(bmp, src, Rect(0, 0, canvas.width, canvas.height), paint)
                 }
             } finally {

@@ -467,7 +467,7 @@ private fun Modifier.placedWhile(shown: () -> Boolean): Modifier {
 /** TEMP diagnostics for the half-black wallpaper after an orientation change; read via su from Termux. */
 private var lastWallpaperDbgKey: String? = null
 
-private fun wallpaperDbg(
+internal fun wallpaperDbg(
     context: Context,
     line: String,
 ) {
