@@ -62,13 +62,14 @@ fun ShortcutTile(
             .padding(4.dp),
     ) {
         val showLabel = LauncherStyle.style[Style.APP_LABELS] || showsLabel()
+        // A square frame sized to the cell's smaller side; the label sits outside it, under the tile.
+        val frameSize = tileIconSize(showLabel)
         Column(
             Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
         ) {
             // A square frame sized to the cell's smaller side; the label sits outside it, under the tile.
-            val frameSize = tileIconSize(showLabel)
             Box(
                 Modifier.size(frameSize).tileFrame(focused),
                 contentAlignment = Alignment.Center,
@@ -77,7 +78,7 @@ fun ShortcutTile(
                 when {
                     // Bare silhouettes and initials sit on a badge, as in the drawer, so they read on any wallpaper.
                     bare && (mono || bmp == null) ->
-                        IconBadge(iconSize = frameSize * 0.85f) {
+                        IconBadge(frameSize * 0.85f) {
                             if (bmp != null) {
                                 Image(bmp, spoken, Modifier.size(frameSize * 0.6f), colorFilter = ColorFilter.tint(Palette.accent))
                             } else {
