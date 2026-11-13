@@ -58,9 +58,13 @@ class SessionBridge(
             done
             printf '%s\n' "${'$'} ${'$'}first" >> "${'$'}D/bc.out"
             ( eval "${'$'}block" ) >> "${'$'}D/bc.out" 2>>"${'$'}D/bc.err"
-            printf '__OMARCHY_EXIT__%s\n' "${'$'}?" >> "${'$'}D/bc.out"
+            printf '__OMARCHY_EXIT__%s\\n' "${'$'}?" >> "${'$'}D/bc.out"
+            # Busy: poll tight so the next command lands fast.
+            sleep 0.05
+          else
+            # Idle: poll slowly. The old fixed 0.2s loop kept the CPU busy and the phone warm.
+            sleep 1.0
           fi
-          sleep 0.2
         done
         """.trimIndent()
 
